@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobility Insights</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ================= UPLOAD SCREEN ================= -->
+    <div id="screen-upload" class="screen">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle js-app-subtitle">Tableau de bord — Freins à la mobilité internationale étudiante</p>
+          </div>
+          <div class="header-actions">
+            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Rapport complet (PDF)</a>
+            <button id="btn-back-to-dashboard" class="btn btn-ghost" style="display:none;">← Retour au tableau de bord</button>
+          </div>
+        </div>
+      </header>
+      <main>
+        <div class="center-screen">
+          <div class="info-box">
+            <strong>Comment ça marche ?</strong> Importez un ou plusieurs fichiers Excel issus du questionnaire de mobilité
+            (un fichier par université, ou un fichier combiné). Pour chaque fichier, vous pourrez vérifier et ajuster la
+            correspondance des colonnes avant de générer le tableau de bord. Toutes les données restent dans votre navigateur :
+            rien n'est envoyé à un serveur.
+          </div>
+          <div id="dropzone" class="dropzone">
+            <div class="icon">↑</div>
+            <p><strong>Cliquez pour choisir un ou plusieurs fichiers</strong></p>
+            <p>ou déposez-les ici — formats acceptés : .xlsx, .xls</p>
+            <input type="file" id="file-input" accept=".xlsx,.xls" multiple style="display:none">
+          </div>
+          <div id="upload-file-list" class="file-list"></div>
+        </div>
+      </main>
+      <footer class="app-footer">
+        <div class="rainbow-bar" style="margin-bottom:10px;"></div>
+        Mobility Insights — analyse locale, aucune donnée transmise à un serveur externe.
+      </footer>
+    </div>
+
+    <!-- ================= CALIBRATION SCREEN ================= -->
+    <div id="screen-calibration" class="screen" style="display:none;">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle">Étape de calibration — vérification des colonnes</p>
+          </div>
+        </div>
+      </header>
+      <main>
+        <div id="calibration-content"></div>
+      </main>
+    </div>
+
+    <!-- ================= DASHBOARD SCREEN ================= -->
+    <div id="screen-dashboard" class="screen" style="display:none;">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle js-app-subtitle">Tableau de bord — Freins à la mobilité internationale étudiante</p>
+          </div>
+          <div class="header-actions">
+            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Rapport complet (PDF)</a>
+            <button id="btn-add-data" class="btn btn-ghost">+ Ajouter des données</button>
+            <button id="btn-export" class="btn btn-ghost">Exporter (JSON)</button>
+            <button id="btn-reset" class="btn btn-ghost">Réinitialiser</button>
+          </div>
+        </div>
+      </header>
+      <nav class="tabs"><div class="tabs-inner" id="tabs-inner"></div></nav>
+      <main>
+        <div class="filter-bar">
+          <div>
+            <label for="university-select">Université</label>
+            <select id="university-select"></select>
+          </div>
+          <div class="toggle-wrap">
+            <input type="checkbox" id="compare-toggle">
+            <label for="compare-toggle" style="margin:0;text-transform:none;font-weight:600;font-size:0.85rem;">
+              Comparer à l'ensemble de l'échantillon
+            </label>
+          </div>
+          <div class="chip" id="n-chip"></div>
+        </div>
+        <div id="dashboard-sections"></div>
+      </main>
+      <footer class="app-footer">
+        <div class="rainbow-bar" style="margin-bottom:10px;"></div>
+        Mobility Insights — analyse locale, aucune donnée transmise à un serveur externe. Outil de visualisation descriptive ;
+        les tests statistiques affichés sont indicatifs (Chi², Kruskal-Wallis, Mann-Whitney).
+      </footer>
+    </div>
+
+  </div>
+
+  <script src="js/lib/xlsx.full.min.js"></script>
+  <script src="js/lib/chart.umd.min.js"></script>
+  <script src="js/dataEngine.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
