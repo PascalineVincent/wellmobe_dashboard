@@ -304,7 +304,7 @@ const Charts = (() => {
           legend: { display: true, position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
         },
         scales: {
-          x: { grid: { color: "#EEF2F8" }, title: { display: true, text: "Valeur (échelle propre à chaque variable)" } },
+          x: { grid: { color: "#EEF2F8" }, title: { display: true, text: "Value (each variable's own scale)" } },
           y: {
             min: -0.5,
             max: items.length - 0.5,

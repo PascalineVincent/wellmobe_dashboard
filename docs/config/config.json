@@ -1,52 +1,88 @@
 {
   "meta": {
     "title": "Mobility Insights",
-    "subtitle": "Tableau de bord — Freins à la mobilité internationale étudiante",
+    "subtitle": "Dashboard — Barriers to International Student Mobility",
     "version": "1.0",
     "sourceReport": "Barriers to International Student Mobility — Four-Group Approach"
   },
-
   "theme": {
-    "navy":     "#0F2850",
+    "navy": "#0F2850",
     "deepNavy": "#0A1630",
-    "midNavy":  "#122650",
-    "blue":     "#1E4682",
-    "accent":   "#4182C8",
-    "iceBlue":  "#BED7F5",
-    "gold":     "#C39B3C",
-    "light":    "#F5F7FC",
-    "gray":     "#788291",
-    "rainbow": ["#C84650", "#D27832", "#C8AA1E", "#329B5A", "#1E9BB4", "#2D5FC3", "#7D41AF"]
+    "midNavy": "#122650",
+    "blue": "#1E4682",
+    "accent": "#4182C8",
+    "iceBlue": "#BED7F5",
+    "gold": "#C39B3C",
+    "light": "#F5F7FC",
+    "gray": "#788291",
+    "rainbow": [
+      "#C84650",
+      "#D27832",
+      "#C8AA1E",
+      "#329B5A",
+      "#1E9BB4",
+      "#2D5FC3",
+      "#7D41AF"
+    ]
   },
-
   "groups": {
-    "order": ["Already gone", "Wants to go & applied", "Wants to go", "Does not want to go"],
-    "labelsFR": {
-      "Already gone": "Déjà parti·e",
-      "Wants to go & applied": "Veut partir & a postulé",
-      "Wants to go": "Veut partir (pas postulé)",
-      "Does not want to go": "Ne veut pas partir"
-    },
+    "order": [
+      "Already gone",
+      "Wants to go & applied",
+      "Wants to go",
+      "Does not want to go"
+    ],
     "colors": {
       "Already gone": "#27AE60",
       "Wants to go & applied": "#2980B9",
       "Wants to go": "#5DADE2",
       "Does not want to go": "#C0392B"
+    },
+    "labels": {
+      "Already gone": "Already gone",
+      "Wants to go & applied": "Wants to go & applied",
+      "Wants to go": "Wants to go (not applied)",
+      "Does not want to go": "Does not want to go"
     }
   },
-
-  "likertPalette": { "1": "#C0392B", "2": "#E8967A", "3": "#BDC3C7", "4": "#7BAFD4", "5": "#1E4682" },
-  "yesNoColors": { "Yes": "#1E4682", "No": "#C0392B", "No answer": "#788291" },
-
-  "yesValues": ["yes", "oui", "1", "true", "vrai", "2"],
-  "noValues":  ["no", "non", "0", "false", "faux"],
-
+  "likertPalette": {
+    "1": "#C0392B",
+    "2": "#E8967A",
+    "3": "#BDC3C7",
+    "4": "#7BAFD4",
+    "5": "#1E4682"
+  },
+  "yesNoColors": {
+    "Yes": "#1E4682",
+    "No": "#C0392B",
+    "No answer": "#788291"
+  },
+  "yesValues": [
+    "yes",
+    "oui",
+    "1",
+    "true",
+    "vrai",
+    "2"
+  ],
+  "noValues": [
+    "no",
+    "non",
+    "0",
+    "false",
+    "faux"
+  ],
   "gradeMaxRules": [
-    { "match": "florence", "max": 30 },
-    { "match": "nantes", "max": 20 }
+    {
+      "match": "florence",
+      "max": 30
+    },
+    {
+      "match": "nantes",
+      "max": 20
+    }
   ],
   "gradeDefaultMax": 10,
-
   "incomeCategories": [
     "less than 1000",
     "1001 - 1500",
@@ -57,8 +93,16 @@
     "3501 - 4000",
     "more than 4000"
   ],
-  "incomeLabels": ["< 1 000€", "1 001–1 500€", "1 501–2 000€", "2 001–2 500€", "2 501–3 000€", "3 001–3 500€", "3 501–4 000€", "> 4 000€"],
-
+  "incomeLabels": [
+    "< €1,000",
+    "€1,001–1,500",
+    "€1,501–2,000",
+    "€2,001–2,500",
+    "€2,501–3,000",
+    "€3,001–3,500",
+    "€3,501–4,000",
+    "> €4,000"
+  ],
   "educationCategories": [
     "no formal education",
     "primary education",
@@ -67,90 +111,473 @@
     "higher education",
     "postgraduate"
   ],
-  "educationLabels": ["Aucune", "Primaire", "Secondaire", "Formation prof. sup.", "Études supérieures", "Post-graduate"],
-
-  "englishLevels": ["None", "A1", "A2", "B1", "B2", "C1", "C2"],
-  "englishCertifiedFrom": "B2",
-
-  "fields": [
-    { "key": "University",   "col": 2,  "label": "University",            "labelFR": "Université",                "type": "text" },
-    { "key": "genre",        "col": 3,  "label": "Gender",                 "labelFR": "Genre",                      "type": "category" },
-    { "key": "niveau",       "col": 5,  "label": "Study level",            "labelFR": "Niveau d'études",            "type": "category" },
-    { "key": "moyenne_acad", "col": 6,  "label": "Academic grade (raw)",   "labelFR": "Moyenne académique (brute)","type": "numeric" },
-    { "key": "educ_parents", "col": 8,  "label": "Parental education",     "labelFR": "Niveau d'études des parents","type": "ordinal_education" },
-    { "key": "revenu_foyer", "col": 9,  "label": "Household income",       "labelFR": "Revenu du foyer",            "type": "ordinal_income" },
-    { "key": "aisance_fin",  "col": 14, "label": "Financial comfort",      "labelFR": "Aisance financière (1=très à l'aise)", "type": "numeric" },
-    { "key": "depense_imp",  "col": 15, "label": "Can handle €1,000 unexpected expense", "labelFR": "Capacité à absorber une dépense imprévue de 1 000€", "type": "binary_yesno" },
-    { "key": "zone_geo",     "col": 17, "label": "Geographic area",        "labelFR": "Zone géographique",         "type": "category" },
-    { "key": "parental_erasmus", "col": 18, "label": "Parental Erasmus (Q13)", "labelFR": "Parent a fait Erasmus (Q13)", "type": "binary_yesno" },
-
-    { "key": "english_cert", "col": 24, "label": "Certified English level (Q24)", "labelFR": "Niveau d'anglais certifié (Q24)", "type": "ordinal_english" },
-    { "key": "scholarship",  "col": 25, "label": "Scholarship holder (Q25)", "labelFR": "Boursier (Q25)",          "type": "binary_yesno" },
-
-    { "key": "a_participe", "col": 27, "label": "Already went on Erasmus", "labelFR": "A déjà fait un Erasmus",   "type": "binary_yesno" },
-
-    { "key": "erasmus",     "col": 56, "label": "Wants to go on Erasmus",  "labelFR": "Souhaite faire un Erasmus", "type": "binary_yesno" },
-    { "key": "a_postule",   "col": 57, "label": "Has applied",             "labelFR": "A postulé",                 "type": "binary_yesno" },
-    { "key": "raison_non_partir", "col": 58, "label": "Main reason for not going", "labelFR": "Raison principale pour ne pas partir", "type": "text" },
-
-    { "key": "frein_01", "col": 59, "label": "Lack of information", "type": "likert" },
-    { "key": "frein_02", "col": 60, "label": "Lack of financial resources", "type": "likert" },
-    { "key": "frein_03", "col": 61, "label": "Lack of interest", "type": "likert" },
-    { "key": "frein_04", "col": 62, "label": "Family does not give permission", "type": "likert" },
-    { "key": "frein_05", "col": 63, "label": "Grade point average not high enough", "type": "likert" },
-    { "key": "frein_06", "col": 64, "label": "Difficulty finding accommodation abroad", "type": "likert" },
-    { "key": "frein_07", "col": 65, "label": "Concern about lower academic performance", "type": "likert" },
-    { "key": "frein_08", "col": 66, "label": "Interest in other mobility programmes", "type": "likert" },
-    { "key": "frein_09", "col": 67, "label": "Reluctance to leave comfort zone", "type": "likert" },
-    { "key": "frein_10", "col": 68, "label": "Reluctance to be far from close contacts", "type": "likert" },
-    { "key": "frein_11", "col": 69, "label": "Insufficient level of English", "type": "likert" },
-    { "key": "frein_12", "col": 70, "label": "Insufficient level of destination language", "type": "likert" },
-    { "key": "frein_13", "col": 71, "label": "Employment obligations", "type": "likert" },
-    { "key": "frein_14", "col": 72, "label": "Family care responsibilities", "type": "likert" },
-    { "key": "frein_15", "col": 73, "label": "Application process too complex or time-consuming", "type": "likert" },
-    { "key": "frein_16", "col": 74, "label": "Other reasons", "type": "likert" },
-
-    { "key": "raison_01", "col": 75, "label": "Academic knowledge gain", "type": "likert" },
-    { "key": "raison_02", "col": 76, "label": "Experience of living abroad", "type": "likert" },
-    { "key": "raison_03", "col": 77, "label": "Benefits for my CV", "type": "likert" },
-    { "key": "raison_04", "col": 78, "label": "Passing demanding subjects", "type": "likert" },
-    { "key": "raison_05", "col": 79, "label": "Improvement of language skills", "type": "likert" },
-    { "key": "raison_06", "col": 80, "label": "Improved employment prospects", "type": "likert" },
-    { "key": "raison_07", "col": 81, "label": "Country culture", "type": "likert" },
-    { "key": "raison_08", "col": 82, "label": "Academic quality", "type": "likert" },
-    { "key": "raison_09", "col": 83, "label": "Language skills (general)", "type": "likert" },
-    { "key": "raison_10", "col": 84, "label": "Passing courses", "type": "likert" },
-    { "key": "raison_11", "col": 85, "label": "Cost of living", "type": "likert" },
-
-    { "key": "psy_climat",        "col": 110, "label": "Climate importance", "dim": "Optimism & sustainability", "type": "likert" },
-    { "key": "psy_durabilite",    "col": 111, "label": "Sustainable habits", "dim": "Optimism & sustainability", "type": "likert" },
-    { "key": "psy_travailler_etr","col": 112, "label": "Future work abroad", "dim": "International openness", "type": "likert" },
-    { "key": "psy_intl",          "col": 113, "label": "International work preference", "dim": "International openness", "type": "likert" },
-    { "key": "psy_resolution",    "col": 114, "label": "Problem-solving ability", "dim": "Personal efficacy", "type": "likert" },
-    { "key": "psy_equipe",        "col": 115, "label": "Teamwork skills", "dim": "Personal efficacy", "type": "likert" },
-    { "key": "psy_emploi",        "col": 116, "label": "Perceived employability", "dim": "Professional aspirations", "type": "likert" },
-    { "key": "psy_aspirations",   "col": 117, "label": "Career clarity", "dim": "Professional aspirations", "type": "likert" },
-    { "key": "psy_entreprise1",   "col": 118, "label": "Entrepreneurial intention", "dim": "Professional aspirations", "type": "likert" },
-    { "key": "psy_entreprise2",   "col": 119, "label": "Venture viability perception", "dim": "Professional aspirations", "type": "likert" },
-    { "key": "psy_cultures",      "col": 120, "label": "Intercultural contact", "dim": "International openness", "type": "likert" },
-    { "key": "psy_tolerance",     "col": 121, "label": "Tolerance", "dim": "International openness", "type": "likert" },
-    { "key": "psy_appartenance",  "col": 122, "label": "Community belonging", "dim": "International openness", "type": "likert" },
-    { "key": "psy_adaptation",    "col": 123, "label": "Adaptability", "dim": "Personal efficacy", "type": "likert" },
-    { "key": "psy_solutions",     "col": 124, "label": "Coping in difficulties", "dim": "Personal efficacy", "type": "likert" },
-    { "key": "psy_idees",         "col": 125, "label": "Initiative", "dim": "Personal efficacy", "type": "likert" },
-    { "key": "psy_creativite",    "col": 126, "label": "Creativity", "dim": "Creativity & curiosity", "type": "likert" },
-    { "key": "psy_curiosite",     "col": 127, "label": "Curiosity", "dim": "Creativity & curiosity", "type": "likert" },
-    { "key": "psy_europe_aff",    "col": 128, "label": "Interest in Europe", "dim": "International openness", "type": "likert" },
-    { "key": "psy_europe_id",     "col": 129, "label": "European identity", "dim": "International openness", "type": "likert" },
-    { "key": "psy_extra",         "col": 130, "label": "Extracurricular participation", "dim": "Civic engagement", "type": "likert" },
-    { "key": "psy_critique",      "col": 131, "label": "Critical thinking", "dim": "Civic engagement", "type": "likert" },
-    { "key": "psy_monde",         "col": 132, "label": "Interest in current affairs", "dim": "Civic engagement", "type": "likert" },
-    { "key": "psy_vote",          "col": 133, "label": "Interest in democracy", "dim": "Civic engagement", "type": "likert" },
-    { "key": "psy_politique",     "col": 134, "label": "Ideological self-placement", "dim": "Political positioning", "type": "likert" },
-    { "key": "psy_optimisme",     "col": 135, "label": "Generational optimism", "dim": "Optimism & sustainability", "type": "likert" },
-    { "key": "psy_science",       "col": 136, "label": "Confidence in science", "dim": null, "type": "binary_science" }
+  "educationLabels": [
+    "None",
+    "Primary",
+    "Secondary",
+    "Vocational training",
+    "Higher education",
+    "Postgraduate"
   ],
-
+  "englishLevels": [
+    "None",
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1",
+    "C2"
+  ],
+  "englishCertifiedFrom": "B2",
+  "fields": [
+    {
+      "key": "University",
+      "col": 2,
+      "label": "University",
+      "type": "text"
+    },
+    {
+      "key": "genre",
+      "col": 3,
+      "label": "Gender",
+      "type": "category"
+    },
+    {
+      "key": "niveau",
+      "col": 5,
+      "label": "Study level",
+      "type": "category"
+    },
+    {
+      "key": "moyenne_acad",
+      "col": 6,
+      "label": "Academic grade (raw)",
+      "type": "numeric"
+    },
+    {
+      "key": "educ_parents",
+      "col": 8,
+      "label": "Parental education",
+      "type": "ordinal_education"
+    },
+    {
+      "key": "revenu_foyer",
+      "col": 9,
+      "label": "Household income",
+      "type": "ordinal_income"
+    },
+    {
+      "key": "aisance_fin",
+      "col": 14,
+      "label": "Financial comfort",
+      "type": "numeric"
+    },
+    {
+      "key": "depense_imp",
+      "col": 15,
+      "label": "Can handle €1,000 unexpected expense",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "zone_geo",
+      "col": 17,
+      "label": "Geographic area",
+      "type": "category"
+    },
+    {
+      "key": "parental_erasmus",
+      "col": 18,
+      "label": "Parental Erasmus (Q13)",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "english_cert",
+      "col": 24,
+      "label": "Certified English level (Q24)",
+      "type": "ordinal_english"
+    },
+    {
+      "key": "scholarship",
+      "col": 25,
+      "label": "Scholarship holder (Q25)",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "a_participe",
+      "col": 27,
+      "label": "Already went on Erasmus",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "erasmus",
+      "col": 56,
+      "label": "Wants to go on Erasmus",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "a_postule",
+      "col": 57,
+      "label": "Has applied",
+      "type": "binary_yesno"
+    },
+    {
+      "key": "raison_non_partir",
+      "col": 58,
+      "label": "Main reason for not going",
+      "type": "text"
+    },
+    {
+      "key": "frein_01",
+      "col": 59,
+      "label": "Lack of information",
+      "type": "likert"
+    },
+    {
+      "key": "frein_02",
+      "col": 60,
+      "label": "Lack of financial resources",
+      "type": "likert"
+    },
+    {
+      "key": "frein_03",
+      "col": 61,
+      "label": "Lack of interest",
+      "type": "likert"
+    },
+    {
+      "key": "frein_04",
+      "col": 62,
+      "label": "Family does not give permission",
+      "type": "likert"
+    },
+    {
+      "key": "frein_05",
+      "col": 63,
+      "label": "Grade point average not high enough",
+      "type": "likert"
+    },
+    {
+      "key": "frein_06",
+      "col": 64,
+      "label": "Difficulty finding accommodation abroad",
+      "type": "likert"
+    },
+    {
+      "key": "frein_07",
+      "col": 65,
+      "label": "Concern about lower academic performance",
+      "type": "likert"
+    },
+    {
+      "key": "frein_08",
+      "col": 66,
+      "label": "Interest in other mobility programmes",
+      "type": "likert"
+    },
+    {
+      "key": "frein_09",
+      "col": 67,
+      "label": "Reluctance to leave comfort zone",
+      "type": "likert"
+    },
+    {
+      "key": "frein_10",
+      "col": 68,
+      "label": "Reluctance to be far from close contacts",
+      "type": "likert"
+    },
+    {
+      "key": "frein_11",
+      "col": 69,
+      "label": "Insufficient level of English",
+      "type": "likert"
+    },
+    {
+      "key": "frein_12",
+      "col": 70,
+      "label": "Insufficient level of destination language",
+      "type": "likert"
+    },
+    {
+      "key": "frein_13",
+      "col": 71,
+      "label": "Employment obligations",
+      "type": "likert"
+    },
+    {
+      "key": "frein_14",
+      "col": 72,
+      "label": "Family care responsibilities",
+      "type": "likert"
+    },
+    {
+      "key": "frein_15",
+      "col": 73,
+      "label": "Application process too complex or time-consuming",
+      "type": "likert"
+    },
+    {
+      "key": "frein_16",
+      "col": 74,
+      "label": "Other reasons",
+      "type": "likert"
+    },
+    {
+      "key": "raison_01",
+      "col": 75,
+      "label": "Academic knowledge gain",
+      "type": "likert"
+    },
+    {
+      "key": "raison_02",
+      "col": 76,
+      "label": "Experience of living abroad",
+      "type": "likert"
+    },
+    {
+      "key": "raison_03",
+      "col": 77,
+      "label": "Benefits for my CV",
+      "type": "likert"
+    },
+    {
+      "key": "raison_04",
+      "col": 78,
+      "label": "Passing demanding subjects",
+      "type": "likert"
+    },
+    {
+      "key": "raison_05",
+      "col": 79,
+      "label": "Improvement of language skills",
+      "type": "likert"
+    },
+    {
+      "key": "raison_06",
+      "col": 80,
+      "label": "Improved employment prospects",
+      "type": "likert"
+    },
+    {
+      "key": "raison_07",
+      "col": 81,
+      "label": "Country culture",
+      "type": "likert"
+    },
+    {
+      "key": "raison_08",
+      "col": 82,
+      "label": "Academic quality",
+      "type": "likert"
+    },
+    {
+      "key": "raison_09",
+      "col": 83,
+      "label": "Language skills (general)",
+      "type": "likert"
+    },
+    {
+      "key": "raison_10",
+      "col": 84,
+      "label": "Passing courses",
+      "type": "likert"
+    },
+    {
+      "key": "raison_11",
+      "col": 85,
+      "label": "Cost of living",
+      "type": "likert"
+    },
+    {
+      "key": "psy_climat",
+      "col": 110,
+      "label": "Climate importance",
+      "dim": "Optimism & sustainability",
+      "type": "likert"
+    },
+    {
+      "key": "psy_durabilite",
+      "col": 111,
+      "label": "Sustainable habits",
+      "dim": "Optimism & sustainability",
+      "type": "likert"
+    },
+    {
+      "key": "psy_travailler_etr",
+      "col": 112,
+      "label": "Future work abroad",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_intl",
+      "col": 113,
+      "label": "International work preference",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_resolution",
+      "col": 114,
+      "label": "Problem-solving ability",
+      "dim": "Personal efficacy",
+      "type": "likert"
+    },
+    {
+      "key": "psy_equipe",
+      "col": 115,
+      "label": "Teamwork skills",
+      "dim": "Personal efficacy",
+      "type": "likert"
+    },
+    {
+      "key": "psy_emploi",
+      "col": 116,
+      "label": "Perceived employability",
+      "dim": "Professional aspirations",
+      "type": "likert"
+    },
+    {
+      "key": "psy_aspirations",
+      "col": 117,
+      "label": "Career clarity",
+      "dim": "Professional aspirations",
+      "type": "likert"
+    },
+    {
+      "key": "psy_entreprise1",
+      "col": 118,
+      "label": "Entrepreneurial intention",
+      "dim": "Professional aspirations",
+      "type": "likert"
+    },
+    {
+      "key": "psy_entreprise2",
+      "col": 119,
+      "label": "Venture viability perception",
+      "dim": "Professional aspirations",
+      "type": "likert"
+    },
+    {
+      "key": "psy_cultures",
+      "col": 120,
+      "label": "Intercultural contact",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_tolerance",
+      "col": 121,
+      "label": "Tolerance",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_appartenance",
+      "col": 122,
+      "label": "Community belonging",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_adaptation",
+      "col": 123,
+      "label": "Adaptability",
+      "dim": "Personal efficacy",
+      "type": "likert"
+    },
+    {
+      "key": "psy_solutions",
+      "col": 124,
+      "label": "Coping in difficulties",
+      "dim": "Personal efficacy",
+      "type": "likert"
+    },
+    {
+      "key": "psy_idees",
+      "col": 125,
+      "label": "Initiative",
+      "dim": "Personal efficacy",
+      "type": "likert"
+    },
+    {
+      "key": "psy_creativite",
+      "col": 126,
+      "label": "Creativity",
+      "dim": "Creativity & curiosity",
+      "type": "likert"
+    },
+    {
+      "key": "psy_curiosite",
+      "col": 127,
+      "label": "Curiosity",
+      "dim": "Creativity & curiosity",
+      "type": "likert"
+    },
+    {
+      "key": "psy_europe_aff",
+      "col": 128,
+      "label": "Interest in Europe",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_europe_id",
+      "col": 129,
+      "label": "European identity",
+      "dim": "International openness",
+      "type": "likert"
+    },
+    {
+      "key": "psy_extra",
+      "col": 130,
+      "label": "Extracurricular participation",
+      "dim": "Civic engagement",
+      "type": "likert"
+    },
+    {
+      "key": "psy_critique",
+      "col": 131,
+      "label": "Critical thinking",
+      "dim": "Civic engagement",
+      "type": "likert"
+    },
+    {
+      "key": "psy_monde",
+      "col": 132,
+      "label": "Interest in current affairs",
+      "dim": "Civic engagement",
+      "type": "likert"
+    },
+    {
+      "key": "psy_vote",
+      "col": 133,
+      "label": "Interest in democracy",
+      "dim": "Civic engagement",
+      "type": "likert"
+    },
+    {
+      "key": "psy_politique",
+      "col": 134,
+      "label": "Ideological self-placement",
+      "dim": "Political positioning",
+      "type": "likert"
+    },
+    {
+      "key": "psy_optimisme",
+      "col": 135,
+      "label": "Generational optimism",
+      "dim": "Optimism & sustainability",
+      "type": "likert"
+    },
+    {
+      "key": "psy_science",
+      "col": 136,
+      "label": "Confidence in science",
+      "dim": null,
+      "type": "binary_science"
+    }
+  ],
   "dimsPsyOrder": [
     "International openness",
     "Personal efficacy",
@@ -160,30 +587,65 @@
     "Optimism & sustainability",
     "Political positioning"
   ],
-  "dimsPsyLabelsFR": {
-    "International openness": "Ouverture internationale",
-    "Personal efficacy": "Efficacité personnelle",
-    "Creativity & curiosity": "Créativité & curiosité",
-    "Professional aspirations": "Aspirations professionnelles",
-    "Civic engagement": "Engagement civique",
-    "Optimism & sustainability": "Optimisme & durabilité",
-    "Political positioning": "Positionnement politique"
-  },
-
-  "scoreIntlCols": ["psy_travailler_etr", "psy_intl", "psy_cultures", "psy_tolerance", "psy_europe_id", "psy_curiosite", "psy_adaptation", "psy_monde"],
-
-  "psyOpennessCols": ["psy_travailler_etr", "psy_intl", "psy_cultures", "psy_tolerance", "psy_europe_id"],
-  "psyEfficacyCols": ["psy_resolution", "psy_equipe", "psy_adaptation", "psy_solutions"],
-
+  "scoreIntlCols": [
+    "psy_travailler_etr",
+    "psy_intl",
+    "psy_cultures",
+    "psy_tolerance",
+    "psy_europe_id",
+    "psy_curiosite",
+    "psy_adaptation",
+    "psy_monde"
+  ],
+  "psyOpennessCols": [
+    "psy_travailler_etr",
+    "psy_intl",
+    "psy_cultures",
+    "psy_tolerance",
+    "psy_europe_id"
+  ],
+  "psyEfficacyCols": [
+    "psy_resolution",
+    "psy_equipe",
+    "psy_adaptation",
+    "psy_solutions"
+  ],
   "grp23CompareVars": [
-    { "key": "score_intl",        "label": "Score profil international (0-10)" },
-    { "key": "aisance_fin",       "label": "Aisance financière (1=meilleur)" },
-    { "key": "moyenne_acad_norm", "label": "Moyenne académique (norm. 0-10)" },
-    { "key": "educ_num",          "label": "Éducation des parents" },
-    { "key": "revenu_num",        "label": "Revenu du foyer" },
-    { "key": "depense_imp",       "label": "Peut absorber 1 000€ (1=oui)" },
-    { "key": "scholarship",       "label": "Boursier (1=oui)" },
-    { "key": "psy_openness",      "label": "Ouverture internationale (psy, 1-5)" },
-    { "key": "psy_efficacy",      "label": "Efficacité personnelle (psy, 1-5)" }
+    {
+      "key": "score_intl",
+      "label": "International profile score (0-10)"
+    },
+    {
+      "key": "aisance_fin",
+      "label": "Financial comfort (1=very comfortable, 5=not at all)"
+    },
+    {
+      "key": "moyenne_acad_norm",
+      "label": "Academic grade (normalized 0-10)"
+    },
+    {
+      "key": "educ_num",
+      "label": "Parental education (1-6)"
+    },
+    {
+      "key": "revenu_num",
+      "label": "Household income (1-8)"
+    },
+    {
+      "key": "depense_imp",
+      "label": "Can absorb €1,000 expense (1=yes)"
+    },
+    {
+      "key": "scholarship",
+      "label": "Scholarship holder (1=yes)"
+    },
+    {
+      "key": "psy_openness",
+      "label": "International openness (psy, 1-5)"
+    },
+    {
+      "key": "psy_efficacy",
+      "label": "Personal efficacy (psy, 1-5)"
+    }
   ]
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,26 +16,26 @@
         <div class="header-inner">
           <div>
             <h1 class="js-app-title">Mobility Insights</h1>
-            <p class="subtitle js-app-subtitle">Tableau de bord — Freins à la mobilité internationale étudiante</p>
+            <p class="subtitle js-app-subtitle">Dashboard — Barriers to International Student Mobility</p>
           </div>
           <div class="header-actions">
-            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Rapport complet (PDF)</a>
-            <button id="btn-back-to-dashboard" class="btn btn-ghost" style="display:none;">← Retour au tableau de bord</button>
+            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Full report (PDF)</a>
+            <button id="btn-back-to-dashboard" class="btn btn-ghost" style="display:none;">← Back to dashboard</button>
           </div>
         </div>
       </header>
       <main>
         <div class="center-screen">
           <div class="info-box">
-            <strong>Comment ça marche ?</strong> Importez un ou plusieurs fichiers Excel issus du questionnaire de mobilité
-            (un fichier par université, ou un fichier combiné). Pour chaque fichier, vous pourrez vérifier et ajuster la
-            correspondance des colonnes avant de générer le tableau de bord. Toutes les données restent dans votre navigateur :
-            rien n'est envoyé à un serveur.
+            <strong>How does it work?</strong> Import one or more Excel files from the mobility questionnaire
+            (one file per university, or a combined file). For each file, you'll be able to check and adjust the column
+            mapping before generating the dashboard. All data stays in your browser:
+            nothing is sent to a server.
           </div>
           <div id="dropzone" class="dropzone">
             <div class="icon">↑</div>
-            <p><strong>Cliquez pour choisir un ou plusieurs fichiers</strong></p>
-            <p>ou déposez-les ici — formats acceptés : .xlsx, .xls</p>
+            <p><strong>Click to choose one or more files</strong></p>
+            <p>or drop them here — accepted formats: .xlsx, .xls</p>
             <input type="file" id="file-input" accept=".xlsx,.xls" multiple style="display:none">
           </div>
           <div id="upload-file-list" class="file-list"></div>
@@ -43,7 +43,7 @@
       </main>
       <footer class="app-footer">
         <div class="rainbow-bar" style="margin-bottom:10px;"></div>
-        Mobility Insights — analyse locale, aucune donnée transmise à un serveur externe.
+        Mobility Insights — local analysis, no data sent to an external server.
       </footer>
     </div>
 
@@ -54,7 +54,7 @@
         <div class="header-inner">
           <div>
             <h1 class="js-app-title">Mobility Insights</h1>
-            <p class="subtitle">Étape de calibration — vérification des colonnes</p>
+            <p class="subtitle">Calibration step — column check</p>
           </div>
         </div>
       </header>
@@ -70,13 +70,13 @@
         <div class="header-inner">
           <div>
             <h1 class="js-app-title">Mobility Insights</h1>
-            <p class="subtitle js-app-subtitle">Tableau de bord — Freins à la mobilité internationale étudiante</p>
+            <p class="subtitle js-app-subtitle">Dashboard — Barriers to International Student Mobility</p>
           </div>
           <div class="header-actions">
-            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Rapport complet (PDF)</a>
-            <button id="btn-add-data" class="btn btn-ghost">+ Ajouter des données</button>
-            <button id="btn-export" class="btn btn-ghost">Exporter (JSON)</button>
-            <button id="btn-reset" class="btn btn-ghost">Réinitialiser</button>
+            <a href="rapport_mobility.pdf" target="_blank" class="btn btn-ghost">Full report (PDF)</a>
+            <button id="btn-add-data" class="btn btn-ghost">+ Add data</button>
+            <button id="btn-export" class="btn btn-ghost">Export (JSON)</button>
+            <button id="btn-reset" class="btn btn-ghost">Reset</button>
           </div>
         </div>
       </header>
@@ -84,13 +84,13 @@
       <main>
         <div class="filter-bar">
           <div>
-            <label for="university-select">Université</label>
+            <label for="university-select">University</label>
             <select id="university-select"></select>
           </div>
           <div class="toggle-wrap">
             <input type="checkbox" id="compare-toggle">
             <label for="compare-toggle" style="margin:0;text-transform:none;font-weight:600;font-size:0.85rem;">
-              Comparer à l'ensemble de l'échantillon
+              Compare to the entire sample
             </label>
           </div>
           <div class="chip" id="n-chip"></div>
@@ -99,8 +99,8 @@
       </main>
       <footer class="app-footer">
         <div class="rainbow-bar" style="margin-bottom:10px;"></div>
-        Mobility Insights — analyse locale, aucune donnée transmise à un serveur externe. Outil de visualisation descriptive ;
-        les tests statistiques affichés sont indicatifs (Chi², Kruskal-Wallis, Mann-Whitney).
+        Mobility Insights — local analysis, no data sent to an external server. Descriptive visualization tool;
+        the statistical tests shown are indicative (Chi², Kruskal-Wallis, Mann-Whitney).
       </footer>
     </div>
 

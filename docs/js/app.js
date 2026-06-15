@@ -22,20 +22,20 @@
 
   const CATEGORY_MAP = [
     { test: (k) => k === "University", label: "Identification" },
-    { test: (k) => ["genre", "niveau", "zone_geo", "educ_parents", "revenu_foyer"].includes(k), label: "Socio-démographie" },
-    { test: (k) => ["moyenne_acad", "english_cert", "scholarship"].includes(k), label: "Académique & linguistique" },
-    { test: (k) => ["aisance_fin", "depense_imp"].includes(k), label: "Profil financier" },
-    { test: (k) => ["parental_erasmus", "a_participe", "erasmus", "a_postule", "raison_non_partir"].includes(k), label: "Mobilité" },
-    { test: (k) => k.startsWith("frein_"), label: "Freins à la mobilité (1-5)" },
-    { test: (k) => k.startsWith("raison_"), label: "Raisons de départ — Groupe 1 (1-5)" },
-    { test: (k) => k.startsWith("psy_"), label: "Profil psychologique (1-5)" },
+    { test: (k) => ["genre", "niveau", "zone_geo", "educ_parents", "revenu_foyer"].includes(k), label: "Socio-demographics" },
+    { test: (k) => ["moyenne_acad", "english_cert", "scholarship"].includes(k), label: "Academic & language" },
+    { test: (k) => ["aisance_fin", "depense_imp"].includes(k), label: "Financial profile" },
+    { test: (k) => ["parental_erasmus", "a_participe", "erasmus", "a_postule", "raison_non_partir"].includes(k), label: "Mobility" },
+    { test: (k) => k.startsWith("frein_"), label: "Barriers to mobility (1-5)" },
+    { test: (k) => k.startsWith("raison_"), label: "Reasons for going — Group 1 (1-5)" },
+    { test: (k) => k.startsWith("psy_"), label: "Psychological profile (1-5)" },
   ];
   function fieldCategory(key) {
     const m = CATEGORY_MAP.find((c) => c.test(key));
-    return m ? m.label : "Autre";
+    return m ? m.label : "Other";
   }
   function orderedFieldsForCalibration(config) {
-    const cats = [...new Set(CATEGORY_MAP.map((c) => c.label)), "Autre"];
+    const cats = [...new Set(CATEGORY_MAP.map((c) => c.label)), "Other"];
     const out = [];
     cats.forEach((catLabel) => config.fields.forEach((f) => { if (fieldCategory(f.key) === catLabel) out.push(f); }));
     return out;
@@ -169,7 +169,7 @@
           selectedSheet: wb.sheetNames[0],
         });
       } catch (e) {
-        console.error("Erreur de lecture du fichier", file.name, e);
+        console.error("Error reading file", file.name, e);
       }
     }
     processQueue();
@@ -224,7 +224,7 @@
     const sheetOptions = item.sheetNames.map((s) =>
       `<option value="${s}" ${s === item.selectedSheet ? "selected" : ""}>${s}</option>`).join("");
 
-    const templateOptions = `<option value="__default__">Mapping par défaut (config)</option>` +
+    const templateOptions = `<option value="__default__">Default mapping (config)</option>` +
       Object.keys(templates).map((name) => `<option value="${name}">${name}</option>`).join("");
 
     let lastCategory = null;
@@ -235,41 +235,41 @@
         catRow = `<tr><td colspan="2" class="mapping-cat">${cat}</td></tr>`;
         lastCategory = cat;
       }
-      const opts = [`<option value="0" ${f.col === 0 ? "selected" : ""}>— (non disponible) —</option>`]
+      const opts = [`<option value="0" ${f.col === 0 ? "selected" : ""}>— (not available) —</option>`]
         .concat(cols.map((c) => {
-          const label = `Col ${c.index} — ${truncate(c.header || "(sans titre)", 28)}` +
-            (c.samples.length ? ` — ex: ${c.samples.map((s) => truncate(s, 14)).join(", ")}` : "");
+          const label = `Col ${c.index} — ${truncate(c.header || "(no title)", 28)}` +
+            (c.samples.length ? ` — e.g. ${c.samples.map((s) => truncate(s, 14)).join(", ")}` : "");
           return `<option value="${c.index}" ${c.index === f.col ? "selected" : ""}>${DE.escapeHtml(truncate(label, 90))}</option>`;
         }));
-      return catRow + `<tr><td>${DE.escapeHtml(f.labelFR || f.label)}</td><td><select data-field="${f.key}">${opts.join("")}</select></td></tr>`;
+      return catRow + `<tr><td>${DE.escapeHtml(f.label)}</td><td><select data-field="${f.key}">${opts.join("")}</select></td></tr>`;
     }).join("");
 
     content.innerHTML = `
       <div class="info-box">
-        Fichier : <strong>${item.fileName}</strong>
-        ${item.sheetNames.length > 1 ? ` — feuille : <select id="sheet-select" style="margin-left:6px;">${sheetOptions}</select>` : ""}
-        <br>Vérifiez la correspondance entre les variables attendues (gauche) et les colonnes de ce fichier (droite). Les valeurs par défaut suivent la structure habituelle du questionnaire — ajustez-les si ce fichier diffère.
+        File: <strong>${DE.escapeHtml(item.fileName)}</strong>
+        ${item.sheetNames.length > 1 ? ` — sheet: <select id="sheet-select" style="margin-left:6px;">${sheetOptions}</select>` : ""}
+        <br>Check the correspondence between the expected variables (left) and the columns in this file (right). The default values follow the usual structure of the questionnaire — adjust them if this file differs.
       </div>
       <div class="flex-between" style="margin-bottom:14px; align-items: flex-end;">
         <div>
-          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">Université (si la colonne ne contient pas un nom utilisable)</label><br>
-          <input type="text" id="university-override" placeholder="ex : University of Nantes" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);min-width:300px;font-family:inherit;">
+          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">University (if the column doesn't contain a usable name)</label><br>
+          <input type="text" id="university-override" placeholder="e.g. University of Nantes" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);min-width:300px;font-family:inherit;">
         </div>
         <div>
-          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">Modèle de correspondance</label><br>
+          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">Mapping template</label><br>
           <select id="template-select" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-family:inherit;">${templateOptions}</select>
-          <button id="btn-save-template" class="btn btn-light btn-sm">Enregistrer comme modèle</button>
+          <button id="btn-save-template" class="btn btn-light btn-sm">Save as template</button>
         </div>
       </div>
       <div style="max-height:440px; overflow:auto; border:1px solid var(--border); border-radius:10px;">
-        <table class="mapping-table"><thead><tr><th>Variable attendue</th><th>Colonne source du fichier</th></tr></thead>
+        <table class="mapping-table"><thead><tr><th>Expected variable</th><th>Source column in file</th></tr></thead>
         <tbody>${tableRows}</tbody></table>
       </div>
       <div class="flex-between" style="margin-top:18px;">
-        <button id="btn-cancel-file" class="btn btn-light">Ignorer ce fichier</button>
+        <button id="btn-cancel-file" class="btn btn-light">Skip this file</button>
         <div style="display:flex; gap:10px;">
-          <button id="btn-use-default" class="btn btn-light">Utiliser le mapping par défaut</button>
-          <button id="btn-confirm-mapping" class="btn btn-primary">Valider et continuer</button>
+          <button id="btn-use-default" class="btn btn-light">Use default mapping</button>
+          <button id="btn-confirm-mapping" class="btn btn-primary">Confirm and continue</button>
         </div>
       </div>
     `;
@@ -294,7 +294,7 @@
     });
 
     document.getElementById("btn-save-template").addEventListener("click", () => {
-      const name = window.prompt("Nom du modèle de correspondance (ex : nom de l'université ou de la source) :");
+      const name = window.prompt("Name for this mapping template (e.g. university or source name):");
       if (!name) return;
       saveTemplate(name, readMappingFromForm(content));
       renderCalibration(item);
@@ -346,7 +346,7 @@
 
   function setupDashboardScreen() {
     const tabsInner = document.getElementById("tabs-inner");
-    const tabs = Dashboard.SECTIONS.map((s) => ({ id: s.id, label: s.label })).concat([{ id: "data", label: "Données" }]);
+    const tabs = Dashboard.SECTIONS.map((s) => ({ id: s.id, label: s.label })).concat([{ id: "data", label: "Data" }]);
     tabsInner.innerHTML = tabs.map((t) => `<button data-tab="${t.id}">${t.label}</button>`).join("");
     tabsInner.querySelectorAll("button").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -384,7 +384,7 @@
     });
     document.getElementById("btn-export").addEventListener("click", exportJSON);
     document.getElementById("btn-reset").addEventListener("click", () => {
-      if (window.confirm("Réinitialiser supprimera toutes les données importées de ce navigateur. Continuer ?")) {
+      if (window.confirm("Resetting will delete all data imported in this browser. Continue?")) {
         resetAll();
       }
     });
@@ -394,7 +394,7 @@
     const select = document.getElementById("university-select");
     const universities = [...new Set(state.records.map((r) => r.University))].sort();
     const totalN = state.records.length;
-    select.innerHTML = `<option value="ALL">Toutes les universités (n=${totalN})</option>` +
+    select.innerHTML = `<option value="ALL">All universities (n=${totalN})</option>` +
       universities.map((u) => {
         const n = state.records.filter((r) => r.University === u).length;
         return `<option value="${DE.escapeHtml(u)}">${DE.escapeHtml(u)} (n=${n})</option>`;
@@ -418,7 +418,7 @@
 
   function updateNChip() {
     const base = state.selectedUniversity === "ALL" ? state.records : state.records.filter((r) => r.University === state.selectedUniversity);
-    document.getElementById("n-chip").textContent = `n = ${base.length} répondant${base.length === 1 ? "" : "s"}`;
+    document.getElementById("n-chip").textContent = `n = ${base.length} respondent${base.length === 1 ? "" : "s"}`;
   }
 
   function renderActiveTab() {
@@ -453,33 +453,33 @@
     state.records.forEach((r) => { byUniversity[r.University] = (byUniversity[r.University] || 0) + 1; });
 
     const filesHtml = state.datasets.length === 0
-      ? `<div class="empty-state"><p>Aucun fichier importé pour l'instant.</p></div>`
+      ? `<div class="empty-state"><p>No files imported yet.</p></div>`
       : `<table class="stat-table">
-          <thead><tr><th>Fichier source</th><th>Université détectée</th><th class="num">Répondants</th></tr></thead>
+          <thead><tr><th>Source file</th><th>Detected university</th><th class="num">Respondents</th></tr></thead>
           <tbody>${state.datasets.map((d) => `<tr><td>${DE.escapeHtml(d.fileName)}</td><td>${DE.escapeHtml(d.university)}</td><td class="num">${d.n}</td></tr>`).join("")}</tbody>
         </table>`;
 
     container.innerHTML = `
-      <div class="section-title"><span class="stripe"></span><h2>Gestion des données</h2></div>
-      <p class="section-desc">Liste des fichiers importés et des universités disponibles. Les données restent stockées localement dans votre navigateur — rien n'est envoyé à un serveur externe.</p>
+      <div class="section-title"><span class="stripe"></span><h2>Data management</h2></div>
+      <p class="section-desc">List of imported files and available universities. Data stays stored locally in your browser — nothing is sent to an external server.</p>
       <div class="grid">
-        <div class="card"><h3>Fichiers importés</h3>${filesHtml}</div>
-        <div class="card"><h3>Répondants par université</h3>
+        <div class="card"><h3>Imported files</h3>${filesHtml}</div>
+        <div class="card"><h3>Respondents per university</h3>
           <table class="stat-table">
-            <thead><tr><th>Université</th><th class="num">Répondants</th></tr></thead>
+            <thead><tr><th>University</th><th class="num">Respondents</th></tr></thead>
             <tbody>${Object.keys(byUniversity).sort().map((u) => `<tr><td>${DE.escapeHtml(u)}</td><td class="num">${byUniversity[u]}</td></tr>`).join("")}</tbody>
           </table>
         </div>
       </div>
       <div class="card" style="margin-top:18px;">
         <h3>Actions</h3>
-        <p class="card-note">Ajoutez les données d'une autre université, exportez l'ensemble fusionné en JSON (par exemple pour le déposer dans <code>data/dataset.json</code> sur GitHub afin qu'il soit chargé automatiquement à l'ouverture), réimportez un export précédent, ou réinitialisez l'outil.</p>
+        <p class="card-note">Add data from another university, export the merged dataset as JSON (for example to place it in <code>data/dataset.json</code> on GitHub so it loads automatically), re-import a previous export, or reset the tool.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; padding-bottom:14px;">
-          <button id="btn-data-add" class="btn btn-primary">+ Ajouter des données</button>
-          <button id="btn-data-export" class="btn btn-light">Exporter (JSON)</button>
-          <button id="btn-data-import" class="btn btn-light">Importer un export JSON</button>
+          <button id="btn-data-add" class="btn btn-primary">+ Add data</button>
+          <button id="btn-data-export" class="btn btn-light">Export (JSON)</button>
+          <button id="btn-data-import" class="btn btn-light">Import a JSON export</button>
           <input type="file" id="data-import-input" accept=".json" style="display:none;">
-          <button id="btn-data-reset" class="btn btn-light">Réinitialiser</button>
+          <button id="btn-data-reset" class="btn btn-light">Reset</button>
         </div>
       </div>
     `;
@@ -487,7 +487,7 @@
     document.getElementById("btn-data-add").addEventListener("click", () => { refreshUploadScreen(); showScreen("upload"); });
     document.getElementById("btn-data-export").addEventListener("click", exportJSON);
     document.getElementById("btn-data-reset").addEventListener("click", () => {
-      if (window.confirm("Réinitialiser supprimera toutes les données importées de ce navigateur. Continuer ?")) resetAll();
+      if (window.confirm("Resetting will delete all data imported in this browser. Continue?")) resetAll();
     });
     document.getElementById("btn-data-import").addEventListener("click", () => document.getElementById("data-import-input").click());
     document.getElementById("data-import-input").addEventListener("change", importJSON);
@@ -506,7 +506,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      window.alert("Erreur lors de l'export : " + e.message);
+      window.alert("Export error: " + e.message);
     }
   }
 
@@ -523,10 +523,10 @@
           persist();
           buildDashboard();
         } else {
-          window.alert("Fichier JSON invalide ou vide.");
+          window.alert("Invalid or empty JSON file.");
         }
       } catch (err) {
-        window.alert("Impossible de lire ce fichier JSON.");
+        window.alert("Unable to read this JSON file.");
       }
     };
     reader.readAsText(file);
