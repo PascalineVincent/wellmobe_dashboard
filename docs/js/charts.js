@@ -101,7 +101,7 @@ const Charts = (() => {
         },
         scales: opts.horizontal ? {
           x: { beginAtZero: true, max: opts.max, grid: { color: "#EEF2F8" } },
-          y: { grid: { display: false }, ticks: opts.yTicks },
+          y: { grid: { display: false }, ticks: Object.assign({ autoSkip: false }, opts.yTicks || {}) },
         } : {
           x: { grid: { display: false }, ticks: { autoSkip: false } },
           y: { beginAtZero: true, max: opts.max, grid: { color: "#EEF2F8" }, ticks: opts.yTicks },
@@ -139,9 +139,9 @@ const Charts = (() => {
         },
         scales: opts.horizontal ? {
           x: { beginAtZero: true, max: opts.max, grid: { color: "#EEF2F8" }, reverse: opts.xReverse || false },
-          y: { grid: { display: false } },
+          y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 11 } } },
         } : {
-          x: { grid: { display: false } },
+          x: { grid: { display: false }, ticks: { autoSkip: false } },
           y: { beginAtZero: true, max: opts.max, grid: { color: "#EEF2F8" }, reverse: opts.xReverse || false },
         },
       },
@@ -206,7 +206,7 @@ const Charts = (() => {
         },
         scales: {
           x: { stacked: true, beginAtZero: true, max: 100, grid: { color: "#EEF2F8" }, ticks: { callback: (v) => v + "%" } },
-          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, autoSkip: false } },
         },
       },
     });
@@ -306,11 +306,15 @@ const Charts = (() => {
         scales: {
           x: { grid: { color: "#EEF2F8" }, title: { display: true, text: "Value (each variable's own scale)" } },
           y: {
+            type: "linear",
             min: -0.5,
             max: items.length - 0.5,
+            afterBuildTicks: (axis) => {
+              axis.ticks = items.map((it, i) => ({ value: i }));
+            },
             ticks: {
-              stepSize: 1,
               callback: (v) => labels[v] !== undefined ? labels[v] : "",
+              font: { size: 11 },
             },
             grid: { color: "#EEF2F8" },
           },

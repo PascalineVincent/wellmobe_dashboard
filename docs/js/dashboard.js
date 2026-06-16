@@ -737,7 +737,7 @@ const Dashboard = (() => {
             <strong>Mobility Insights</strong> is an interactive exploration tool for survey data on
             barriers to international student mobility (Erasmus-type exchanges). It is based on the
             analytical framework of the report <em>"Barriers to International Student Mobility —
-            Four-Group Approach"</em> by Pascaline Vincent, which classifies respondents into four
+            Four-Group Approach"</em>, a collective work which classifies respondents into four
             mobility profiles (already gone, wants to go and has applied, wants to go without having
             applied, does not want to go) and examines socio-demographic, academic, financial, and
             psychological factors associated with mobility decisions.
