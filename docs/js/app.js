@@ -48,7 +48,7 @@
   // ---------------------------------------------------------
 
   async function init() {
-    const res = await fetch("config/config.json?v=6");
+    const res = await fetch("config/config.json?v=7");
     state.config = await res.json();
     Dashboard.init(state.config);
 

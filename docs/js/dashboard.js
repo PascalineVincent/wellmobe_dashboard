@@ -1076,44 +1076,6 @@ const Dashboard = (() => {
         </div>`;
     }).join("");
 
-    // Mini distribution bar for V_i by group
-    function vulnDist(vals, color, label) {
-      if (!vals.length) return "";
-      const buckets = [0,0,0,0,0]; // 0-2, 2-4, 4-6, 6-8, 8-10
-      vals.forEach(v => { const i = Math.min(4, Math.floor(v / 2)); buckets[i]++; });
-      const max = Math.max(...buckets, 1);
-      const bLabels = ["0-2","2-4","4-6","6-8","8-10"];
-      const bColors = ["#329B5A","#7EC88A","#D27832","#C84650","#8B1E23"];
-      return `<div style="margin-bottom:6px;font-size:0.78rem;font-weight:700;color:var(--navy);">${label} (n=${vals.length}, mean=${DE.mean(vals).toFixed(2)})</div>
-        <div style="display:flex;gap:3px;align-items:flex-end;height:38px;margin-bottom:10px;">
-          ${buckets.map((b,i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
-            <span style="font-size:0.65rem;color:var(--gray);">${b}</span>
-            <div style="width:100%;background:${bColors[i]};height:${Math.round(b/max*30)+2}px;border-radius:2px 2px 0 0;"></div>
-            <span style="font-size:0.62rem;color:var(--gray);">${bLabels[i]}</span>
-          </div>`).join("")}
-        </div>`;
-    }
-
-    const vulnDistHtml = (vulnAll.length > 0) ? `
-      <div class="card" style="border-left:4px solid #4182C8; margin-bottom:14px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:1.3rem;">📊</span>
-          <h3 style="margin:0;">Structural Vulnerability Index — distribution by group</h3>
-        </div>
-        <p class="card-note">V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>) / 5 × 10 &nbsp;|&nbsp; Scale: 0 = no constraint, 10 = maximum &nbsp;|&nbsp; Threshold V<sub>i</sub> > 6 = "resigned non-mover"</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:8px;">
-          ${vulnAll.length  ? vulnDist(vulnAll, "#4182C8", "All respondents") : ""}
-          ${vulnG2.length   ? vulnDist(vulnG2,  "#2980B9", "Group 2 — Wants to go & applied") : ""}
-          ${vulnG3.length   ? vulnDist(vulnG3,  "#5DADE2", "Group 3 — Wants to go (not applied)") : ""}
-        </div>
-        <div style="margin-top:4px;padding:8px 12px;background:#FFF3E0;border-radius:6px;font-size:0.8rem;">
-          <strong>Resigned non-movers (V<sub>i</sub> > 6):</strong>
-          ${vulnAll.length  ? `All: ${base.filter(r=>r.vuln_high===1).length}/${base.length} (${Math.round(base.filter(r=>r.vuln_high===1).length/base.length*100)}%)` : ""}
-          ${vulnG2.length   ? ` &nbsp;|&nbsp; G2: ${resignedG2n}/${grp2.length} (${Math.round(resignedG2pct)}%)` : ""}
-          ${vulnG3.length   ? ` &nbsp;|&nbsp; G3: ${resignedG3n}/${grp3.length} (${Math.round(resignedG3pct)}%)` : ""}
-        </div>
-      </div>` : "";
-
     const noteHtml = `
       <div class="info-box" style="margin-top:18px;">
         <strong>How to read these indicators</strong><br>
@@ -1127,9 +1089,116 @@ const Dashboard = (() => {
     container.innerHTML = sectionHeader("Policy Warnings",
       "Automatically computed indicators flagging situations that may require attention from administrators or policy makers. The Structural Vulnerability Index (V<sub>i</sub>) summarises financial, academic and parental capital constraints into a single 0-10 score. Each indicator includes a suggested policy recommendation. All indicators update in real time as you switch between universities.") +
       summaryHtml +
-      vulnDistHtml +
       `<div class="grid cols-1">${cardsHtml}</div>` +
       noteHtml;
+  }
+
+  // ===========================================================
+  // M. Structural Vulnerability Index
+  // ===========================================================
+  function renderVulnerability(ctx) {
+    const { base } = getCtxData(ctx);
+    const order = CFG.groups.order, labels = CFG.groups.labels;
+    const container = document.getElementById("section-vulnerability");
+
+    if (base.length === 0) {
+      container.innerHTML = sectionHeader("Structural Vulnerability Index", "") +
+        emptyState("No data for this selection.");
+      return;
+    }
+
+    const byGroup = {};
+    order.forEach(g => {
+      byGroup[g] = base.filter(r => r.groupe === g)
+        .map(r => r.score_vuln).filter(v => v !== null && !isNaN(v));
+    });
+
+    const bLabels = ["0–2","2–4","4–6","6–8","8–10"];
+    const bColors = ["#329B5A","#7EC88A","#D27832","#C84650","#8B1E23"];
+
+    function bucketize(vals) {
+      const b = [0,0,0,0,0];
+      vals.forEach(v => { b[Math.min(4, Math.floor(v / 2))]++; });
+      const n = vals.length || 1;
+      return b.map(x => Math.round(x / n * 100));
+    }
+
+    const groupMeans = order.map(g => byGroup[g].length ? DE.mean(byGroup[g]) : null);
+    const groupSE    = order.map(g => byGroup[g].length ? DE.se(byGroup[g])   : null);
+
+    const subcomps = [
+      { key: "aisance_fin",       label: "Financial comfort (F)" },
+      { key: "revenu_num",        label: "Household income (F)" },
+      { key: "depense_imp",       label: "Can absorb \u20ac1k expense (F)" },
+      { key: "moyenne_acad_norm", label: "Academic grade (A)" },
+      { key: "educ_num",          label: "Parental education (E)" },
+    ];
+
+    const resignedRow = order.map(g => {
+      const grp = base.filter(r => r.groupe === g);
+      const n = grp.length;
+      const nh = grp.filter(r => r.vuln_high === 1).length;
+      return { g, n, nh, pct: n > 0 ? Math.round(nh / n * 100) : null };
+    });
+
+    const mwu = DE.mannWhitneyU(byGroup["Wants to go & applied"], byGroup["Wants to go"]);
+
+    container.innerHTML = sectionHeader("Structural Vulnerability Index",
+      `V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>) / 5 × 10 — 
+      <strong>F<sub>i</sub></strong>: financial constraint composite (financial comfort + household income + ability to absorb unexpected expense); 
+      <strong>A<sub>i</sub></strong>: academic constraint; 
+      <strong>E<sub>i</sub></strong>: parental education constraint. 
+      Missing → 2.5. Scale: 0 = no constraint, 10 = maximum. Threshold V<sub>i</sub> > 6 = "resigned non-mover".`) +
+      `<div class="grid">
+        ${card("chart-vuln-means", "V\u1d62 by group — mean \u00b1 SE",
+          `Mean ± SE per mobility group. G2 vs G3: ${sigBadge(mwu.p)} (Mann-Whitney).`)}
+        ${card("chart-vuln-dist", "V\u1d62 distribution by group — score brackets (%)",
+          "Share of each group in each vulnerability bracket (0–2 = low, 8–10 = very high).", "", "h-300")}
+      </div>
+      <div class="grid cols-1"><div class="card">
+        <h3>Resigned non-movers (V<sub>i</sub> > 6) by group</h3>
+        <p class="card-note">Students whose accumulated structural constraints exceed the critical threshold.</p>
+        <table class="stat-table">
+          <thead><tr><th>Group</th><th class="num">n</th><th class="num">V<sub>i</sub> > 6</th><th class="num">Share</th><th class="num">Mean V<sub>i</sub></th></tr></thead>
+          <tbody>${resignedRow.map(r => {
+            const m = byGroup[r.g].length ? DE.mean(byGroup[r.g]).toFixed(2) : "–";
+            const col = r.pct !== null && r.pct > 40 ? "#C84650" : r.pct > 20 ? "#D27832" : "#329B5A";
+            return `<tr><td>${labels[r.g]}</td><td class="num">${r.n}</td>
+              <td class="num">${r.nh}</td>
+              <td class="num" style="color:${col};font-weight:700;">${r.pct !== null ? r.pct + "%" : "–"}</td>
+              <td class="num">${m}</td></tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div></div>
+      <div class="grid cols-1"><div class="card">
+        <h3>Sub-component means by group</h3>
+        <p class="card-note">Raw variable means per group. Financial comfort: 1 = very comfortable, 5 = not at all; household income: 1–8; ability to absorb €1k expense: 1 = yes, 0 = no; academic grade: 0–10; parental education: 1–6.</p>
+        <table class="stat-table">
+          <thead><tr><th>Variable</th>${order.map(g => `<th class="num">${labels[g]}</th>`).join("")}</tr></thead>
+          <tbody>${subcomps.map(sc => {
+            const vals = order.map(g => {
+              const v = DE.mean(base.filter(r => r.groupe === g).map(r => r[sc.key]).filter(x => x !== null && !isNaN(x)));
+              return v !== null ? v.toFixed(2) : "–";
+            });
+            return `<tr><td>${sc.label}</td>${vals.map(v => `<td class="num">${v}</td>`).join("")}</tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div></div>`;
+
+    Charts.groupedBarChart(document.getElementById("chart-vuln-means"),
+      order.map(g => labels[g]),
+      [{ label: "Mean V\u1d62", data: groupMeans, errorBars: groupSE,
+         color: order.map(g => CFG.groups.colors[g]) }],
+      { max: 10 });
+
+    Charts.groupedBarChart(document.getElementById("chart-vuln-dist"),
+      order.map(g => labels[g]),
+      bLabels.map((bl, bi) => ({
+        label: bl,
+        data: order.map(g => bucketize(byGroup[g])[bi]),
+        color: bColors[bi],
+      })),
+      { max: 100 });
   }
 
   // ===========================================================
@@ -1145,6 +1214,7 @@ const Dashboard = (() => {
     { id: "barriers",      label: "Barriers to mobility", render: renderBarriers },
     { id: "reasons",       label: "Reasons for going",    render: renderReasons },
     { id: "grp23",         label: "Group 2 vs 3",         render: renderGrp23 },
+    { id: "vulnerability", label: "Vulnerability Index",  render: renderVulnerability },
     { id: "universities",  label: "Universities",         render: renderUniversities },
     { id: "stats",         label: "Statistical tests",    render: renderStats },
     { id: "warnings",      label: "⚠️ Policy Warnings",  render: renderWarnings },
