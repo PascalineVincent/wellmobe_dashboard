@@ -766,7 +766,7 @@ const Dashboard = (() => {
   }
 
   // ===========================================================
-  // L. Policy Warnings
+  // L. Policy Warnings — two sections: G4 + G2/G3
   // ===========================================================
   function renderWarnings(ctx) {
     const { all, base, compareActive, sel } = getCtxData(ctx);
@@ -779,13 +779,12 @@ const Dashboard = (() => {
       return;
     }
 
-    // ---- helper: compute all indicators ----
+    const grp1 = base.filter(r => r.groupe === "Already gone");
     const grp2 = base.filter(r => r.groupe === "Wants to go & applied");
     const grp3 = base.filter(r => r.groupe === "Wants to go");
-    const wantToGo = base.filter(r => r.profil === "Yes" && r.a_participe !== "Yes");
-    const grp1 = base.filter(r => r.groupe === "Already gone");
+    const grp4 = base.filter(r => r.groupe === "Does not want to go");
     const n123 = grp1.length + grp2.length + grp3.length;
-    const n23 = grp2.length + grp3.length;
+    const n23  = grp2.length + grp3.length;
 
     function safeM(arr, field) {
       const vals = arr.map(r => r[field]).filter(v => v !== null && v !== undefined && !isNaN(v));
@@ -795,301 +794,312 @@ const Dashboard = (() => {
       const valid = arr.filter(r => r[field] !== null && r[field] !== undefined);
       return valid.length ? valid.filter(r => r[field] === val).length / valid.length * 100 : null;
     }
-    function highBarrierPct(arr, key, threshold) {
-      const vals = arr.map(r => r[key]).filter(v => v !== null && !isNaN(v));
-      return vals.length ? vals.filter(v => v >= threshold).length / vals.length * 100 : null;
+    function vulnVals(arr) {
+      return arr.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v));
     }
 
-    // ── Structural Vulnerability Index ────────────────────────
-    const vulnAll  = base.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v));
-    const vulnG2   = grp2.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v));
-    const vulnG3   = grp3.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v));
-    const vulnMeanAll = vulnAll.length ? DE.mean(vulnAll) : null;
-    const vulnMeanG2  = vulnG2.length  ? DE.mean(vulnG2)  : null;
-    const vulnMeanG3  = vulnG3.length  ? DE.mean(vulnG3)  : null;
+    // ── G4 computations ──────────────────────────────────────
+    const g4pct        = n > 0 ? grp4.length / n * 100 : null;
+    const g4VulnVals   = vulnVals(grp4);
+    const g123VulnVals = vulnVals([...grp1,...grp2,...grp3]);
+    const g4VulnMean   = g4VulnVals.length ? DE.mean(g4VulnVals) : null;
+    const g123VulnMean = g123VulnVals.length ? DE.mean(g123VulnVals) : null;
+    const g4ResignedN  = grp4.filter(r => r.vuln_high === 1).length;
+    const g4ResignedPct= grp4.length > 0 ? g4ResignedN / grp4.length * 100 : null;
+    const mwuG4G123    = DE.mannWhitneyU(g4VulnVals, g123VulnVals);
+    const g4IntlMean   = safeM(grp4, "score_intl");
+    const g123IntlMean = safeM([...grp1,...grp2,...grp3], "score_intl");
+    const g4IntlGap    = (g4IntlMean !== null && g123IntlMean !== null) ? g4IntlMean - g123IntlMean : null;
+    // Dominant barrier in G4
+    const freinFields  = CFG.fields.filter(f => f.key.startsWith("frein_"));
+    const g4BarrierMeans = freinFields.map(f => ({ key: f.key, label: f.label, m: safeM(grp4, f.key) }))
+      .filter(x => x.m !== null).sort((a,b) => b.m - a.m);
+    const g4TopBarrier = g4BarrierMeans.length ? g4BarrierMeans[0] : null;
+    const g4FirstGenPct= grp4.length > 0 ? grp4.filter(r => r.educ_num !== null && r.educ_num <= 2).length / grp4.length * 100 : null;
+    const g4ParentalPct= safePct(grp4, "parental_erasmus", "Yes");
+    const g4ComfortMean= safeM(grp4, "aisance_fin");
+    const g3ComfortMean= safeM(grp3, "aisance_fin");
+    // G4 vs G3 vulnerability (are they really different, or hidden G3?)
+    const mwuG4G3Vuln  = DE.mannWhitneyU(g4VulnVals, vulnVals(grp3));
+    const g3VulnMean   = vulnVals(grp3).length ? DE.mean(vulnVals(grp3)) : null;
+    const g4G3VulnGap  = (g4VulnMean !== null && g3VulnMean !== null) ? g4VulnMean - g3VulnMean : null;
+
+    // ── G2/G3 computations ───────────────────────────────────
+    const vulnG2      = vulnVals(grp2), vulnG3 = vulnVals(grp3);
+    const vulnMeanG2  = vulnG2.length ? DE.mean(vulnG2) : null;
+    const vulnMeanG3  = vulnG3.length ? DE.mean(vulnG3) : null;
+    const vulnMeanAll = vulnVals(base).length ? DE.mean(vulnVals(base)) : null;
     const vulnGap     = (vulnMeanG3 !== null && vulnMeanG2 !== null) ? vulnMeanG3 - vulnMeanG2 : null;
     const mwuVuln     = DE.mannWhitneyU(vulnG2, vulnG3);
-    // % "resigned non-movers" (V_i > 6) in G3
-    const resignedG3n   = grp3.filter(r => r.vuln_high === 1).length;
-    const resignedG3pct = grp3.length > 0 ? (resignedG3n / grp3.length) * 100 : null;
-    const resignedG2n   = grp2.filter(r => r.vuln_high === 1).length;
-    const resignedG2pct = grp2.length > 0 ? (resignedG2n / grp2.length) * 100 : null;
-
-    // 1. Financial barrier among Group 3 (wants to go, not applied)
-    const finBarrierG3 = safeM(grp3, "frein_02"); // Lack of financial resources
-    // 2. Admin complexity barrier (frein_15)
-    const adminBarrier = safeM(base.filter(r => r.groupe !== "Wants to go & applied"), "frein_15");
-    // 3. Conversion rate (G2 / G2+G3)
-    const convRate = n123 > 0 ? ((grp1.length + grp2.length) / n123) * 100 : null;
-    // 4. % first-generation in G3 (educ_num <= 2)
-    const firstGenG3 = grp3.filter(r => r.educ_num !== null && r.educ_num <= 2).length;
-    const firstGenG3pct = grp3.length > 0 ? firstGenG3 / grp3.length * 100 : null;
-    const firstGenG2 = grp2.filter(r => r.educ_num !== null && r.educ_num <= 2).length;
-    const firstGenG2pct = grp2.length > 0 ? firstGenG2 / grp2.length * 100 : null;
-    // 5. Language barrier (frein_11 + frein_12 mean)
-    const langBarrier = safeM(base.filter(r => r.groupe === "Wants to go"), "frein_11");
-    // 6. No English certification (B2+) in G2+G3
-    const noEngG23 = [...grp2, ...grp3].filter(r => r.english_certified === 0).length;
-    const noEngG23pct = n23 > 0 ? noEngG23 / n23 * 100 : null;
-    // 7. Parental Erasmus rate (very low = no family transmission)
+    const resignedG3n = grp3.filter(r => r.vuln_high === 1).length;
+    const resignedG3pct = grp3.length > 0 ? resignedG3n / grp3.length * 100 : null;
+    const resignedG2n = grp2.filter(r => r.vuln_high === 1).length;
+    const resignedG2pct = grp2.length > 0 ? resignedG2n / grp2.length * 100 : null;
+    const convRate    = n123 > 0 ? (grp1.length + grp2.length) / n123 * 100 : null;
+    const finBarrierG3= safeM(grp3, "frein_02");
+    const adminBarrier= safeM([...grp3,...grp4], "frein_15");
+    const comfortG2   = safeM(grp2, "aisance_fin");
+    const comfortG3   = safeM(grp3, "aisance_fin");
+    const comfortGap  = (comfortG2 !== null && comfortG3 !== null) ? comfortG3 - comfortG2 : null;
+    const firstGenG3  = grp3.length > 0 ? grp3.filter(r => r.educ_num !== null && r.educ_num <= 2).length / grp3.length * 100 : null;
+    const firstGenG2  = grp2.length > 0 ? grp2.filter(r => r.educ_num !== null && r.educ_num <= 2).length / grp2.length * 100 : null;
+    const langBarrier = safeM(grp3, "frein_11");
+    const noEngG23pct = n23 > 0 ? [...grp2,...grp3].filter(r => r.english_certified === 0).length / n23 * 100 : null;
     const parentalErasPct = safePct(base, "parental_erasmus", "Yes");
-    // 8. Financial comfort gap G2 vs G3 (lower mean = more comfortable since 1=best)
-    const comfortG2 = safeM(grp2, "aisance_fin");
-    const comfortG3 = safeM(grp3, "aisance_fin");
-    const comfortGap = (comfortG2 !== null && comfortG3 !== null) ? comfortG3 - comfortG2 : null;
-    // 9. International profile score vs overall
-    const scoreIntlBase = safeM(base, "score_intl");
-    const scoreIntlAll = safeM(all, "score_intl");
-    const scoreIntlGap = (scoreIntlBase !== null && scoreIntlAll !== null && compareActive)
-      ? scoreIntlAll - scoreIntlBase : null;
-    // 10. Scholarship in G3 vs G2
-    const schG3 = safePct(grp3, "scholarship", 1);
-    const schG2 = safePct(grp2, "scholarship", 1);
+    const scoreIntlGap= (compareActive && safeM(base,"score_intl") !== null && safeM(all,"score_intl") !== null)
+      ? safeM(all,"score_intl") - safeM(base,"score_intl") : null;
 
-    // ---- define warning cards ----
-    const indicators = [
-      {
-        id: "vuln_mean",
-        title: "Structural Vulnerability Index — average score (0-10)",
-        value: vulnMeanAll,
-        format: v => v.toFixed(2) + "/10"
-          + (vulnMeanG2 !== null ? `  |  G2: ${vulnMeanG2.toFixed(2)}` : "")
-          + (vulnMeanG3 !== null ? `  |  G3: ${vulnMeanG3.toFixed(2)}` : ""),
-        thresholds: [
-          { max: 4,        level: "green",  icon: "✓", label: "Low" },
-          { max: 6,        level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red",    icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => {
-          const gapStr = vulnGap !== null
-            ? ` Group 3 scores <strong>${vulnGap > 0 ? "+" : ""}${vulnGap.toFixed(2)} pts</strong> above Group 2 on the vulnerability scale${mwuVuln.p !== null ? ` (Mann-Whitney p=${mwuVuln.p < 0.001 ? "<0.001" : mwuVuln.p.toFixed(3)})` : ""}.`
-            : "";
-          return `The Structural Vulnerability Index V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>) / 5 × 10 aggregates financial constraints (F<sub>i</sub>: financial comfort, household income, ability to absorb unexpected expense), academic profile (A<sub>i</sub>), and parental education (E<sub>i</sub>). Scale: 0 = no constraint, 10 = maximum constraint. Overall mean: <strong>${v.toFixed(2)}/10</strong>.${gapStr}`;
-        },
-        recommendation: "Universities with high average vulnerability should prioritise holistic support: financial aid, academic tutoring, and first-generation student programmes working in combination rather than separately.",
-      },
-      {
-        id: "vuln_resigned",
-        title: "\"Resigned non-movers\" in Group 3 (V\u1d62 > 6)",
-        value: resignedG3pct,
-        format: v => Math.round(v) + "% of G3"
-          + (resignedG2pct !== null ? ` (vs ${Math.round(resignedG2pct)}% of G2)` : ""),
-        thresholds: [
-          { max: 20,       level: "green",  icon: "✓", label: "Low" },
-          { max: 40,       level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red",    icon: "⚠️", label: "High — structural barrier" },
-        ],
-        desc: (v) => `<strong>${Math.round(v)}%</strong> of students who want to go but have not applied (Group 3) exceed the V<sub>i</sub> > 6 threshold, indicating that their non-application is likely driven by accumulated structural constraints rather than lack of motivation — the "resigned non-mover" profile.${resignedG2pct !== null ? ` The equivalent share in Group 2 (applied) is ${Math.round(resignedG2pct)}%.` : ""}`,
-        recommendation: "Identify and proactively reach out to high-vulnerability Group 3 students. Standard information campaigns are insufficient for this population — personalised advising and financial pre-commitment mechanisms (guaranteed funding before application) are more effective.",
-        skip: resignedG3pct === null,
-      },
-      {
-        id: "vuln_gap",
-        title: "Vulnerability gap: Group 3 vs Group 2",
-        value: vulnGap,
-        format: v => (v > 0 ? "+" : "") + v.toFixed(2) + " pts"
-          + (mwuVuln.p !== null ? `  (${mwuVuln.p < 0.05 ? "★ significant" : "n.s."}, p=${mwuVuln.p < 0.001 ? "<0.001" : mwuVuln.p.toFixed(3)})` : ""),
-        thresholds: [
-          { max: 0.5,      level: "green",  icon: "✓", label: "Negligible" },
-          { max: 1.5,      level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red",    icon: "⚠️", label: "Significant" },
-        ],
-        desc: (v) => `Group 3 (wants to go, not applied) scores on average <strong>${v > 0 ? "+" : ""}${v.toFixed(2)} points</strong> higher than Group 2 (applied) on the Structural Vulnerability Index. Both groups share the same desire for mobility — a positive gap confirms that structural constraints, not motivation, are the differentiating factor.`,
-        recommendation: "This gap is the key policy signal: targeted structural support (financial bridges, administrative simplification, language preparation) for Group 3 students is more likely to increase mobility than awareness campaigns.",
-        skip: vulnGap === null,
-      },
-      {
-        id: "conv",
-        title: "Conversion rate: wants to go → applied",
-        value: convRate,
-        format: v => Math.round(v) + "%",
-        thresholds: [
-          { max: 30, level: "red",    icon: "⚠️", label: "Critical" },
-          { max: 50, level: "orange", icon: "⚡", label: "Attention" },
-          { max: Infinity, level: "green", icon: "✓", label: "Satisfactory" },
-        ],
-        desc: (v) => `<strong>${Math.round(v)}%</strong> of students who expressed a desire for mobility (Groups 1+2+3) have either already gone or have applied (Groups 1+2). Formula: (G1+G2) / (G1+G2+G3). A low rate suggests that intent is not translating into action.`,
-        recommendation: "Review and simplify the application process. Consider dedicated guidance sessions for students in Group 3 who have not yet applied.",
-        groups: `G1: n=${grp1.length}, G2: n=${grp2.length}, G3: n=${grp3.length}`,
-      },
-      {
-        id: "fin",
-        title: "Financial barrier — Group 3 (wants to go, not applied)",
-        value: finBarrierG3,
-        format: v => v.toFixed(1) + "/5",
-        thresholds: [
-          { max: 2.5, level: "green",  icon: "✓", label: "Low" },
-          { max: 3.5, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => `Average score for "lack of financial resources" barrier among students who want to go but have not applied: <strong>${v.toFixed(1)}/5</strong>. A high score indicates that financial constraints are a key obstacle to the transition from intent to application.`,
-        recommendation: "Strengthen targeted financial aid communication and accessibility for Group 3 students. Consider increasing grants or introducing emergency mobility funds.",
-      },
-      {
-        id: "comfort_gap",
-        title: "Financial comfort gap: Group 3 vs Group 2",
-        value: comfortGap,
-        format: v => (v > 0 ? "+" : "") + v.toFixed(2) + " pts (1-5 scale)",
-        thresholds: [
-          { max: 0.2, level: "green",  icon: "✓", label: "Negligible" },
-          { max: 0.5, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "Significant" },
-        ],
-        desc: (v) => `Group 3 (not applied) scores <strong>${v > 0 ? "+" : ""}${v.toFixed(2)} points</strong> above Group 2 on the financial discomfort scale (1=very comfortable, 5=not comfortable at all; positive gap = Group 3 less comfortable). This suggests financial constraint may be what differentiates non-applicants from applicants among motivated students.`,
-        recommendation: "Prioritize financial support for motivated but non-applying students. Link outreach to scholarship information.",
-        skip: comfortGap === null,
-      },
-      {
-        id: "admin",
-        title: "Administrative complexity barrier",
-        value: adminBarrier,
-        format: v => v.toFixed(1) + "/5",
-        thresholds: [
-          { max: 2.5, level: "green",  icon: "✓", label: "Low" },
-          { max: 3.5, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => `Average score for "application process too complex or time-consuming" among non-going students: <strong>${v.toFixed(1)}/5</strong>. High scores point to institutional friction in the mobility process.`,
-        recommendation: "Audit the Erasmus application process at institutional level. Identify and remove unnecessary steps. Assign dedicated mobility advisors.",
-      },
-      {
-        id: "firstgen",
-        title: "First-generation students in Group 3",
-        value: firstGenG3pct,
-        format: v => Math.round(v) + "%" + (firstGenG2pct !== null ? ` (vs ${Math.round(firstGenG2pct)}% in G2)` : ""),
-        thresholds: [
-          { max: 20, level: "green",  icon: "✓", label: "Low" },
-          { max: 35, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => `<strong>${Math.round(v)}%</strong> of students who want to go but have not applied come from families with no higher education background (parents' education ≤ primary).${firstGenG2pct !== null ? ` The equivalent figure for Group 2 (applied) is ${Math.round(firstGenG2pct)}%.` : ""} A large gap signals socio-cultural inequalities in access to mobility.`,
-        recommendation: "Implement targeted outreach and mentoring programs for first-generation students. Alumni mobility ambassadors from similar backgrounds can be particularly effective.",
-      },
-      {
-        id: "lang",
-        title: "Language barrier — Group 3",
-        value: langBarrier,
-        format: v => v.toFixed(1) + "/5",
-        thresholds: [
-          { max: 2.5, level: "green",  icon: "✓", label: "Low" },
-          { max: 3.5, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => `Average score for "insufficient level of English" barrier among students who want to go but have not applied: <strong>${v.toFixed(1)}/5</strong>.`,
-        recommendation: "Develop pre-mobility language support programs. Make English preparation a visible part of the mobility pathway, not a prerequisite students must meet alone.",
-      },
-      {
-        id: "eng_cert",
-        title: "No English certification (B2+) — Groups 2 & 3",
-        value: noEngG23pct,
-        format: v => Math.round(v) + "%",
-        thresholds: [
-          { max: 30, level: "green",  icon: "✓", label: "Low" },
-          { max: 55, level: "orange", icon: "⚡", label: "Moderate" },
-          { max: Infinity, level: "red", icon: "⚠️", label: "High" },
-        ],
-        desc: (v) => `<strong>${Math.round(v)}%</strong> of students who want to go on mobility (Groups 2 and 3 combined) have no English certification at B2 level or above.`,
-        recommendation: "Consider in-house language certification pathways or partnerships with language testing providers.",
-        skip: noEngG23pct === null,
-      },
-      {
-        id: "parental",
-        title: "Parental Erasmus participation rate",
-        value: parentalErasPct,
-        format: v => Math.round(v) + "%",
-        thresholds: [
-          { max: 10, level: "orange", icon: "⚡", label: "Low — institutional information is critical" },
-          { max: Infinity, level: "green", icon: "✓", label: "Moderate/High" },
-        ],
-        desc: (v) => `Only <strong>${Math.round(v)}%</strong> of respondents report that a parent participated in an Erasmus exchange. When this rate is low, word-of-mouth and family transmission cannot be relied upon — formal information channels become essential.`,
-        recommendation: "Invest in institutional information campaigns (open days, testimonials, info sessions) as the primary channel for raising awareness about mobility opportunities.",
-      },
-      {
-        id: "intl_score",
-        title: "International profile score vs overall sample",
-        value: scoreIntlGap,
-        format: v => (v > 0 ? "+" : "") + v.toFixed(1) + " pts",
-        thresholds: [
-          { max: -1, level: "orange", icon: "⚡", label: "Below average" },
-          { max: Infinity, level: "green", icon: "✓", label: "At or above average" },
-        ],
-        desc: (v) => `The selected university's average international profile score is <strong>${v > 0 ? "+" : ""}${v.toFixed(1)} points</strong> compared to the full sample. A negative gap may indicate lower international exposure or weaker internationalisation culture.`,
-        recommendation: "Develop at-home internationalisation initiatives: English-taught courses, virtual exchanges, international guest lectures.",
-        skip: !compareActive || scoreIntlGap === null,
-      },
-    ].filter(ind => !ind.skip);
-
-    function levelColor(level) {
-      return { red: "#C84650", orange: "#D27832", green: "#329B5A" }[level] || "#788291";
+    // ── Shared rendering helpers ─────────────────────────────
+    function levelColor(lv) { return {red:"#C84650",orange:"#D27832",green:"#329B5A"}[lv]||"#788291"; }
+    function getLevel(v, thresholds) {
+      for (const t of thresholds) { if (v < t.max) return t; }
+      return thresholds[thresholds.length-1];
     }
-    function getLevel(value, thresholds) {
-      for (const t of thresholds) { if (value < t.max) return t; }
-      return thresholds[thresholds.length - 1];
-    }
-
-    const computed = indicators.map(ind => {
-      const lv = ind.value !== null ? getLevel(ind.value, ind.thresholds) : null;
-      return { ...ind, level: lv };
-    });
-
-    const nRed    = computed.filter(i => i.level && i.level.level === "red").length;
-    const nOrange = computed.filter(i => i.level && i.level.level === "orange").length;
-    const nGreen  = computed.filter(i => i.level && i.level.level === "green").length;
-
-    const summaryHtml = `
-      <div class="grid cols-3" style="margin-bottom:18px;">
-        <div class="kpi-card" style="background:linear-gradient(135deg,#C84650,#8B1E23);">
-          <div class="kpi-value">${nRed}</div>
-          <div class="kpi-label">Critical — immediate attention</div>
+    function buildCard(ind) {
+      const lv  = ind.value !== null ? getLevel(ind.value, ind.thresholds) : null;
+      const col = lv ? levelColor(lv.level) : "#788291";
+      const icon= lv ? lv.icon : "–";
+      const lbl = lv ? lv.label : "No data";
+      const val = ind.value !== null ? ind.format(ind.value) : "Insufficient data";
+      return `<div class="card" style="border-left:4px solid ${col};margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+          <span style="font-size:1.3rem;">${icon}</span>
+          <h3 style="margin:0;flex:1;">${ind.title}</h3>
+          <span style="background:${col};color:#fff;font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;">${lbl}</span>
         </div>
-        <div class="kpi-card" style="background:linear-gradient(135deg,#D27832,#9B5A1E);">
-          <div class="kpi-value">${nOrange}</div>
-          <div class="kpi-label">Attention — monitor closely</div>
-        </div>
-        <div class="kpi-card" style="background:linear-gradient(135deg,#329B5A,#1E6B3A);">
-          <div class="kpi-value">${nGreen}</div>
-          <div class="kpi-label">Satisfactory</div>
-        </div>
+        <div style="font-size:1.4rem;font-weight:800;color:${col};margin-bottom:8px;">${val}</div>
+        ${ind.value!==null?`<p class="card-note">${ind.desc(ind.value)}</p>`:`<p class="card-note">Not enough data to compute this indicator.</p>`}
+        ${ind.groups?`<p class="card-note" style="color:var(--gray);font-size:0.75rem;">${ind.groups}</p>`:""}
+        ${ind.recommendation?`<div style="background:var(--panel);border-radius:8px;padding:10px 14px;margin-top:8px;">
+          <span style="font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--navy);">💡 Policy recommendation</span>
+          <p style="margin:4px 0 0;font-size:0.84rem;line-height:1.5;color:var(--text);">${ind.recommendation}</p>
+        </div>`:""}
       </div>`;
+    }
+    function summaryKpis(inds) {
+      const r = inds.filter(i=>i.level&&i.level.level==="red").length;
+      const o = inds.filter(i=>i.level&&i.level.level==="orange").length;
+      const g = inds.filter(i=>i.level&&i.level.level==="green").length;
+      return `<div class="grid cols-3" style="margin-bottom:14px;">
+        <div class="kpi-card" style="background:linear-gradient(135deg,#C84650,#8B1E23);"><div class="kpi-value">${r}</div><div class="kpi-label">Critical</div></div>
+        <div class="kpi-card" style="background:linear-gradient(135deg,#D27832,#9B5A1E);"><div class="kpi-value">${o}</div><div class="kpi-label">Attention</div></div>
+        <div class="kpi-card" style="background:linear-gradient(135deg,#329B5A,#1E6B3A);"><div class="kpi-value">${g}</div><div class="kpi-label">Satisfactory</div></div>
+      </div>`;
+    }
+    function computeInds(inds) {
+      return inds.filter(i=>!i.skip).map(i=>({...i, level: i.value!==null?getLevel(i.value,i.thresholds):null}));
+    }
 
-    const cardsHtml = computed.map(ind => {
-      const col = ind.level ? levelColor(ind.level.level) : "#788291";
-      const icon = ind.level ? ind.level.icon : "–";
-      const label = ind.level ? ind.level.label : "No data";
-      const valStr = ind.value !== null ? ind.format(ind.value) : "Insufficient data";
-      return `
-        <div class="card" style="border-left:4px solid ${col}; margin-bottom:14px;">
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
-            <span style="font-size:1.3rem;">${icon}</span>
-            <h3 style="margin:0; flex:1;">${ind.title}</h3>
-            <span style="background:${col}; color:#fff; font-size:0.72rem; font-weight:700;
-              padding:3px 10px; border-radius:999px; white-space:nowrap;">${label}</span>
-          </div>
-          <div style="font-size:1.4rem; font-weight:800; color:${col}; margin-bottom:8px;">${valStr}</div>
-          ${ind.value !== null ? `<p class="card-note">${ind.desc(ind.value)}</p>` : `<p class="card-note">Not enough data to compute this indicator.</p>`}
-          ${ind.groups ? `<p class="card-note" style="color:var(--gray); font-size:0.75rem;">${ind.groups}</p>` : ""}
-          ${ind.recommendation ? `
-            <div style="background:var(--panel); border-radius:8px; padding:10px 14px; margin-top:8px;">
-              <span style="font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--navy);">💡 Policy recommendation</span>
-              <p style="margin:4px 0 0; font-size:0.84rem; line-height:1.5; color:var(--text);">${ind.recommendation}</p>
-            </div>` : ""}
-        </div>`;
-    }).join("");
+    // ── Section 1: Group 4 indicators ───────────────────────
+    const indsG4 = computeInds([
+      {
+        id:"g4_size", title:"Share of students who don't want to go (Group 4)",
+        value: g4pct,
+        format: v => Math.round(v)+`% (n=${grp4.length})`,
+        thresholds:[{max:30,level:"green",icon:"✓",label:"Moderate"},{max:50,level:"orange",icon:"⚡",label:"High"},{max:Infinity,level:"red",icon:"⚠️",label:"Very high"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of respondents declare they do not want to go on an international mobility stay. This is the baseline indicator for the non-mobility population at this institution.`,
+        recommendation:"Investigate the reasons behind non-desire: is it lack of information, perceived irrelevance, or structural resignation? Qualitative follow-up may be needed.",
+      },
+      {
+        id:"g4_vuln", title:"Structural vulnerability — Group 4 vs Groups 1+2+3",
+        value: g4VulnMean,
+        format: v => v.toFixed(2)+"/10" + (g123VulnMean!==null?`  |  G1+2+3: ${g123VulnMean.toFixed(2)}`:""),
+        thresholds:[{max:4,level:"green",icon:"✓",label:"Low"},{max:6,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High — likely constrained non-mobility"}],
+        desc: v => `Group 4 mean Structural Vulnerability Index: <strong>${v.toFixed(2)}/10</strong>${g123VulnMean!==null?` vs ${g123VulnMean.toFixed(2)} for Groups 1+2+3`:""}.${mwuG4G123.p!==null?` Difference: ${sigBadge(mwuG4G123.p)} (Mann-Whitney).`:""} A high score suggests that non-desire may reflect structural resignation rather than a genuine free choice.`,
+        recommendation:"If Group 4 vulnerability is high, awareness campaigns alone will not work — structural barriers (financial, academic, family) must be addressed first.",
+        skip: g4VulnMean===null,
+      },
+      {
+        id:"g4_resigned", title:"\"Constrained non-movers\" in Group 4 (V\u1d62 > 6)",
+        value: g4ResignedPct,
+        format: v => Math.round(v)+`% of G4 (n=${g4ResignedN})`,
+        thresholds:[{max:20,level:"green",icon:"✓",label:"Low"},{max:40,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High — structural resignation"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of Group 4 students exceed the V<sub>i</sub> > 6 threshold. These students' non-desire for mobility is likely linked to accumulated structural constraints — they may be "resigned" rather than genuinely uninterested.`,
+        recommendation:"Targeted outreach to this sub-group should focus on removing barriers first, then raising awareness. Consider personalised mobility advising sessions.",
+        skip: g4ResignedPct===null,
+      },
+      {
+        id:"g4_g3_similar", title:"Vulnerability gap: Group 4 vs Group 3",
+        value: g4G3VulnGap,
+        format: v => (v>0?"+":"")+v.toFixed(2)+" pts" + (mwuG4G3Vuln.p!==null?`  (${mwuG4G3Vuln.p<0.05?"★ sig.":"n.s."}, p=${mwuG4G3Vuln.p<0.001?"<0.001":mwuG4G3Vuln.p.toFixed(3)})` :""),
+        thresholds:[{max:0.5,level:"orange",icon:"⚡",label:"Similar profiles — hidden demand possible"},{max:Infinity,level:"green",icon:"✓",label:"Distinct profiles"}],
+        desc: v => `Group 4 scores <strong>${v>0?"+":""}${v.toFixed(2)} pts</strong> ${v>0?"above":"below"} Group 3 on the Structural Vulnerability Index.${Math.abs(v)<0.5?" The two groups have similar structural profiles, suggesting that a share of Group 4 may represent latent (unexpressed) demand for mobility — \"hidden Group 3\".":" The profiles are sufficiently distinct."}`,
+        recommendation: Math.abs(g4G3VulnGap ?? 1) < 0.5
+          ? "Proactive one-to-one outreach to Group 4 students with similar profiles to Group 3 may activate latent demand. A simple information nudge could shift them."
+          : "Continue monitoring — the two groups are structurally distinct.",
+        skip: g4G3VulnGap===null,
+      },
+      {
+        id:"g4_intl", title:"International profile score — Group 4 vs rest",
+        value: g4IntlGap,
+        format: v => (v>0?"+":"")+v.toFixed(2)+" pts vs G1+2+3",
+        thresholds:[{max:-1.5,level:"red",icon:"⚠️",label:"Much lower — internationalisation deficit"},{max:-0.5,level:"orange",icon:"⚡",label:"Below average"},{max:Infinity,level:"green",icon:"✓",label:"Close to average"}],
+        desc: v => `Group 4's average international profile score (0-10) is <strong>${v>0?"+":""}${v.toFixed(2)} points</strong> compared to Groups 1+2+3. A strongly negative gap indicates that these students have lower international orientation, curiosity, and openness — not just a financial constraint.`,
+        recommendation:"Invest in at-home internationalisation: English-medium courses, virtual exchanges (COIL), international guest events. The goal is building international orientation before addressing mobility itself.",
+        skip: g4IntlGap===null,
+      },
+      {
+        id:"g4_topbarrier", title:`Top barrier in Group 4: "${g4TopBarrier?g4TopBarrier.label:"–"}"`,
+        value: g4TopBarrier ? g4TopBarrier.m : null,
+        format: v => v.toFixed(1)+"/5",
+        thresholds:[{max:2.5,level:"green",icon:"✓",label:"Low"},{max:3.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High — priority target"}],
+        desc: v => g4TopBarrier ? `The highest-rated barrier among Group 4 students is <strong>"${g4TopBarrier.label}"</strong> with a mean score of <strong>${v.toFixed(1)}/5</strong>. This is the single most actionable lever for this group.` : "No barrier data available.",
+        recommendation: g4TopBarrier ? `Address "${g4TopBarrier.label}" directly in institutional communication and support services for Group 4.` : "",
+        skip: g4TopBarrier===null,
+      },
+      {
+        id:"g4_firstgen", title:"First-generation students in Group 4",
+        value: g4FirstGenPct,
+        format: v => Math.round(v)+"%",
+        thresholds:[{max:20,level:"green",icon:"✓",label:"Low"},{max:35,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of Group 4 students come from families with no higher education background. High first-generation representation in non-mobile students signals socio-cultural distance from the concept of international mobility.`,
+        recommendation:"Peer mentoring by first-generation alumni who went on Erasmus, and family information sessions, are among the most effective interventions for this population.",
+        skip: g4FirstGenPct===null,
+      },
+      {
+        id:"g4_parental", title:"Parental Erasmus rate — Group 4",
+        value: g4ParentalPct,
+        format: v => Math.round(v)+"%",
+        thresholds:[{max:10,level:"orange",icon:"⚡",label:"Very low — no family transmission"},{max:Infinity,level:"green",icon:"✓",label:"Moderate"}],
+        desc: v => `Only <strong>${Math.round(v)}%</strong> of Group 4 students report that a parent participated in an Erasmus exchange. With no family reference point, institutional information is the only channel.`,
+        recommendation:"Ensure institutional outreach (open days, dedicated sessions, printed materials) systematically reaches Group 4 students — do not rely on word of mouth.",
+        skip: g4ParentalPct===null,
+      },
+    ]);
 
-    const noteHtml = `
-      <div class="info-box" style="margin-top:18px;">
-        <strong>How to read these indicators</strong><br>
-        Thresholds are indicative and based on the distribution observed in the full dataset.
-        They should be interpreted in context and reviewed by subject-matter experts before being
-        used for formal reporting. When a university is selected, indicators reflect that
-        university's data only${compareActive ? " (comparison values from the full sample are shown where relevant)" : ""}.
-        ${compareActive ? "" : " <strong>Enable \u201CCompare to the entire sample\u201D to unlock the international profile score gap indicator.</strong>"}
+    // ── Section 2: G2/G3 indicators ─────────────────────────
+    const indsG23 = computeInds([
+      {
+        id:"conv", title:"Conversion rate: wants to go → applied or gone",
+        value: convRate,
+        format: v => Math.round(v)+"%",
+        thresholds:[{max:30,level:"red",icon:"⚠️",label:"Critical"},{max:50,level:"orange",icon:"⚡",label:"Attention"},{max:Infinity,level:"green",icon:"✓",label:"Satisfactory"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of motivated students (G1+G2+G3) have either already gone or applied — formula: (G1+G2)/(G1+G2+G3).`,
+        recommendation:"Review and simplify the application process. Consider dedicated guidance sessions for Group 3.",
+        groups:`G1: n=${grp1.length}, G2: n=${grp2.length}, G3: n=${grp3.length}`,
+      },
+      {
+        id:"vuln_mean", title:"Structural Vulnerability Index — G2 vs G3",
+        value: vulnMeanAll,
+        format: v => `All: ${v.toFixed(2)}/10`+(vulnMeanG2!==null?`  |  G2: ${vulnMeanG2.toFixed(2)}`:"")+(vulnMeanG3!==null?`  |  G3: ${vulnMeanG3.toFixed(2)}`:""),
+        thresholds:[{max:4,level:"green",icon:"✓",label:"Low"},{max:6,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `Overall mean V<sub>i</sub>: <strong>${v.toFixed(2)}/10</strong>.${vulnGap!==null?` G3 scores <strong>${vulnGap>0?"+":""}${vulnGap.toFixed(2)} pts</strong> above G2 ${sigBadge(mwuVuln.p)}.`:""}`,
+        recommendation:"Universities with high average vulnerability should combine financial aid, academic support, and first-generation programmes.",
+        skip: vulnMeanAll===null,
+      },
+      {
+        id:"vuln_resigned", title:"\"Resigned non-movers\" (V\u1d62 > 6) in Group 3",
+        value: resignedG3pct,
+        format: v => Math.round(v)+`% of G3`+(resignedG2pct!==null?` (vs ${Math.round(resignedG2pct)}% of G2)`:""),
+        thresholds:[{max:20,level:"green",icon:"✓",label:"Low"},{max:40,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High — structural barrier"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of Group 3 exceed V<sub>i</sub> > 6 — structural constraints likely explain their non-application more than lack of motivation.`,
+        recommendation:"Personalised advising and financial pre-commitment mechanisms are more effective than standard information campaigns for this population.",
+        skip: resignedG3pct===null,
+      },
+      {
+        id:"vuln_gap", title:"Vulnerability gap: Group 3 vs Group 2",
+        value: vulnGap,
+        format: v => (v>0?"+":"")+v.toFixed(2)+" pts"+(mwuVuln.p!==null?`  (${mwuVuln.p<0.05?"★ sig.":"n.s."}, p=${mwuVuln.p<0.001?"<0.001":mwuVuln.p.toFixed(3)})`:""),
+        thresholds:[{max:0.5,level:"green",icon:"✓",label:"Negligible"},{max:1.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"Significant"}],
+        desc: v => `G3 scores <strong>${v>0?"+":""}${v.toFixed(2)} pts</strong> above G2 on V<sub>i</sub>. Same desire, different structural constraints.`,
+        recommendation:"Targeted structural support for G3 is more effective than awareness campaigns.",
+        skip: vulnGap===null,
+      },
+      {
+        id:"fin", title:"Financial barrier — Group 3",
+        value: finBarrierG3,
+        format: v => v.toFixed(1)+"/5",
+        thresholds:[{max:2.5,level:"green",icon:"✓",label:"Low"},{max:3.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `Mean "lack of financial resources" score in G3: <strong>${v.toFixed(1)}/5</strong>.`,
+        recommendation:"Strengthen financial aid targeting and accessibility for Group 3 students.",
+      },
+      {
+        id:"comfort_gap", title:"Financial comfort gap: Group 3 vs Group 2",
+        value: comfortGap,
+        format: v => (v>0?"+":"")+v.toFixed(2)+" pts",
+        thresholds:[{max:0.2,level:"green",icon:"✓",label:"Negligible"},{max:0.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"Significant"}],
+        desc: v => `G3 scores <strong>${v>0?"+":""}${v.toFixed(2)} pts</strong> above G2 on financial discomfort (1=comfortable, 5=not at all). Positive gap = G3 less comfortable.`,
+        recommendation:"Prioritise financial support for motivated but non-applying students.",
+        skip: comfortGap===null,
+      },
+      {
+        id:"admin", title:"Administrative complexity barrier (G3+G4)",
+        value: adminBarrier,
+        format: v => v.toFixed(1)+"/5",
+        thresholds:[{max:2.5,level:"green",icon:"✓",label:"Low"},{max:3.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `Mean "application process too complex" score (G3+G4): <strong>${v.toFixed(1)}/5</strong>.`,
+        recommendation:"Audit and simplify the application process. Assign dedicated mobility advisors.",
+      },
+      {
+        id:"firstgen", title:"First-generation students — Group 3",
+        value: firstGenG3,
+        format: v => Math.round(v)+"%"+(firstGenG2!==null?` (vs ${Math.round(firstGenG2)}% in G2)`:""),
+        thresholds:[{max:20,level:"green",icon:"✓",label:"Low"},{max:35,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of G3 are first-generation students (parental education ≤ primary).${firstGenG2!==null?` G2: ${Math.round(firstGenG2)}%.`:""}`,
+        recommendation:"Mentoring programmes with alumni from similar backgrounds are particularly effective for this group.",
+        skip: firstGenG3===null,
+      },
+      {
+        id:"lang", title:"Language barrier — Group 3",
+        value: langBarrier,
+        format: v => v.toFixed(1)+"/5",
+        thresholds:[{max:2.5,level:"green",icon:"✓",label:"Low"},{max:3.5,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `Mean "insufficient English level" score in G3: <strong>${v.toFixed(1)}/5</strong>.`,
+        recommendation:"Develop pre-mobility language support. English preparation should be part of the mobility pathway, not a prerequisite students must meet alone.",
+      },
+      {
+        id:"eng_cert", title:"No English certification (B2+) — Groups 2 & 3",
+        value: noEngG23pct,
+        format: v => Math.round(v)+"%",
+        thresholds:[{max:30,level:"green",icon:"✓",label:"Low"},{max:55,level:"orange",icon:"⚡",label:"Moderate"},{max:Infinity,level:"red",icon:"⚠️",label:"High"}],
+        desc: v => `<strong>${Math.round(v)}%</strong> of G2+G3 students have no certified English level at B2 or above.`,
+        recommendation:"Consider in-house language certification pathways or partnerships with testing providers.",
+        skip: noEngG23pct===null,
+      },
+      {
+        id:"parental", title:"Parental Erasmus participation rate",
+        value: parentalErasPct,
+        format: v => Math.round(v)+"%",
+        thresholds:[{max:10,level:"orange",icon:"⚡",label:"Low — institutional info critical"},{max:Infinity,level:"green",icon:"✓",label:"Moderate/High"}],
+        desc: v => `Only <strong>${Math.round(v)}%</strong> of respondents report a parent who took part in Erasmus. Word-of-mouth transmission is limited — institutional channels are essential.`,
+        recommendation:"Invest in systematic institutional information campaigns as the primary awareness channel.",
+      },
+      {
+        id:"intl_score", title:"International profile score vs overall sample",
+        value: scoreIntlGap,
+        format: v => (v>0?"+":"")+v.toFixed(1)+" pts",
+        thresholds:[{max:-1,level:"orange",icon:"⚡",label:"Below average"},{max:Infinity,level:"green",icon:"✓",label:"At or above average"}],
+        desc: v => `Selected university's mean international profile score is <strong>${v>0?"+":""}${v.toFixed(1)} pts</strong> vs full sample.`,
+        recommendation:"Develop at-home internationalisation: English-taught courses, virtual exchanges, international guest lectures.",
+        skip: !compareActive || scoreIntlGap===null,
+      },
+    ]);
+
+    // ── Render ───────────────────────────────────────────────
+    const noteHtml = `<div class="info-box" style="margin-top:18px;">
+      <strong>How to read these indicators</strong><br>
+      Thresholds are indicative. Interpret in context and review with subject-matter experts before formal reporting.
+      ${compareActive?"":"<strong>Enable \"Compare to the entire sample\" to unlock the international profile score gap indicator.</strong>"}
+    </div>`;
+
+    const dividerHtml = (title, subtitle) => `
+      <div style="display:flex;align-items:center;gap:14px;margin:28px 0 14px;">
+        <div style="flex:1;height:2px;background:linear-gradient(90deg,var(--accent),transparent);"></div>
+        <div style="text-align:center;">
+          <div style="font-size:1rem;font-weight:800;color:var(--navy);">${title}</div>
+          <div style="font-size:0.78rem;color:var(--gray);">${subtitle}</div>
+        </div>
+        <div style="flex:1;height:2px;background:linear-gradient(270deg,var(--accent),transparent);"></div>
       </div>`;
 
     container.innerHTML = sectionHeader("Policy Warnings",
-      "Automatically computed indicators flagging situations that may require attention from administrators or policy makers. The Structural Vulnerability Index (V<sub>i</sub>) summarises financial, academic and parental capital constraints into a single 0-10 score. Each indicator includes a suggested policy recommendation. All indicators update in real time as you switch between universities.") +
-      summaryHtml +
-      `<div class="grid cols-1">${cardsHtml}</div>` +
+      "Automatically computed indicators organised in two sections: students who don't want to go (Group 4) and motivated students who haven't yet applied or gone (Groups 2 & 3). Each indicator includes a suggested policy recommendation and updates in real time as you switch between universities.") +
+      dividerHtml("Section 1 — Group 4: Students who don't want to go", `n=${grp4.length} respondents`) +
+      summaryKpis(indsG4) +
+      `<div class="grid cols-1">${indsG4.map(buildCard).join("")}</div>` +
+      dividerHtml("Section 2 — Groups 2 & 3: Motivated students who haven't yet gone", `G2: n=${grp2.length} · G3: n=${grp3.length}`) +
+      summaryKpis(indsG23) +
+      `<div class="grid cols-1">${indsG23.map(buildCard).join("")}</div>` +
       noteHtml;
   }
 
