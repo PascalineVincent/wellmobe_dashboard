@@ -277,6 +277,31 @@ const DataEngine = (() => {
     const freinVals = freinKeys.map((k) => rec[k]).filter((v) => v !== null && v !== undefined);
     rec.score_frein_simple = freinVals.length > 0 ? Math.round(mean(freinVals) * 100) / 100 : null;
 
+    // ── Structural Vulnerability Index V_i (0-10) ──────────────
+    // F_i: financial constraint composite (1-5 each sub-component, missing → 2.5)
+    const MISS = 2.5;
+    // aisance_fin: 1=very comfortable, 5=not comfortable — use directly
+    const fi_aisance = (rec.aisance_fin !== null && rec.aisance_fin !== undefined)
+      ? rec.aisance_fin : MISS;
+    // revenu_num: 1-8, higher = more comfortable → invert to 1-5
+    const fi_revenu = (rec.revenu_num !== null && rec.revenu_num !== undefined)
+      ? ((8 - rec.revenu_num) / 7) * 4 + 1 : MISS;
+    // depense_imp: 1=can absorb (low constraint)→1, 0=cannot→5
+    const fi_depense = (rec.depense_imp !== null && rec.depense_imp !== undefined)
+      ? (rec.depense_imp === 1 ? 1 : 5) : MISS;
+    const Fi = (fi_aisance + fi_revenu + fi_depense) / 3;
+
+    // A_i: academic constraint (0=max grade→0 constraint, missing→2.5)
+    const Ai = (rec.moyenne_acad_norm !== null && rec.moyenne_acad_norm !== undefined)
+      ? ((10 - rec.moyenne_acad_norm) / 10) * 5 : MISS;
+
+    // E_i: parental education constraint (educ_num 1-6, high=low constraint)
+    const Ei = (rec.educ_num !== null && rec.educ_num !== undefined)
+      ? ((7 - rec.educ_num) / 6) * 5 : MISS;
+
+    rec.score_vuln = Math.round(((0.4 * Fi + 0.3 * Ai + 0.3 * Ei) / 5 * 10) * 100) / 100;
+    rec.vuln_high = rec.score_vuln > 6 ? 1 : 0; // "resigned non-mover" threshold
+
     return rec;
   }
 
