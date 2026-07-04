@@ -9,6 +9,8 @@
   const STORAGE_RECORDS = "mobins_records";
   const STORAGE_DATASETS = "mobins_datasets";
   const STORAGE_TEMPLATES = "mobins_templates";
+  const STORAGE_VERSION = "mobins_schema_version";
+  const SCHEMA_VERSION = "2"; // bump when derived fields change
 
   const state = {
     config: null,
@@ -46,7 +48,7 @@
   // ---------------------------------------------------------
 
   async function init() {
-    const res = await fetch("config/config.json?v=5");
+    const res = await fetch("config/config.json?v=6");
     state.config = await res.json();
     Dashboard.init(state.config);
 
@@ -83,6 +85,14 @@
 
   function tryRestore() {
     try {
+      // If schema version changed, stale records lack new derived fields — clear them
+      const storedVersion = localStorage.getItem(STORAGE_VERSION);
+      if (storedVersion !== SCHEMA_VERSION) {
+        localStorage.removeItem(STORAGE_RECORDS);
+        localStorage.removeItem(STORAGE_DATASETS);
+        localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
+        return false;
+      }
       const r = localStorage.getItem(STORAGE_RECORDS);
       const d = localStorage.getItem(STORAGE_DATASETS);
       if (!r) return false;
@@ -98,6 +108,7 @@
     try {
       localStorage.setItem(STORAGE_RECORDS, JSON.stringify(state.records));
       localStorage.setItem(STORAGE_DATASETS, JSON.stringify(state.datasets));
+      localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
     } catch (e) { /* storage unavailable, ignore */ }
   }
 
@@ -105,6 +116,7 @@
     try {
       localStorage.removeItem(STORAGE_RECORDS);
       localStorage.removeItem(STORAGE_DATASETS);
+      localStorage.removeItem(STORAGE_VERSION);
     } catch (e) {}
     state.records = [];
     state.datasets = [];
