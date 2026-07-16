@@ -8,6 +8,7 @@
 
   const STORAGE_RECORDS = "mobins_records";
   const STORAGE_DATASETS = "mobins_datasets";
+  const STORAGE_RAW = "mobins_raw";
   const STORAGE_TEMPLATES = "mobins_templates";
   const STORAGE_VERSION = "mobins_schema_version";
   const SCHEMA_VERSION = "2"; // bump when derived fields change
@@ -49,7 +50,7 @@
   // ---------------------------------------------------------
 
   async function init() {
-    const res = await fetch("config/config.json?v=10");
+    const res = await fetch("config/config.json?v=11");
     state.config = await res.json();
     Dashboard.init(state.config);
 
@@ -86,11 +87,11 @@
 
   function tryRestore() {
     try {
-      // If schema version changed, stale records lack new derived fields — clear them
       const storedVersion = localStorage.getItem(STORAGE_VERSION);
       if (storedVersion !== SCHEMA_VERSION) {
         localStorage.removeItem(STORAGE_RECORDS);
         localStorage.removeItem(STORAGE_DATASETS);
+        localStorage.removeItem(STORAGE_RAW);
         localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
         return false;
       }
@@ -101,6 +102,13 @@
       if (!Array.isArray(records) || records.length === 0) return false;
       state.records = records;
       state.datasets = d ? JSON.parse(d) : [];
+      // Restore raw datasets for variable explorer (may be absent if too large)
+      try {
+        const raw = localStorage.getItem(STORAGE_RAW);
+        state.rawDatasets = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        state.rawDatasets = [];
+      }
       return true;
     } catch (e) { return false; }
   }
@@ -110,13 +118,30 @@
       localStorage.setItem(STORAGE_RECORDS, JSON.stringify(state.records));
       localStorage.setItem(STORAGE_DATASETS, JSON.stringify(state.datasets));
       localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
-    } catch (e) { /* storage unavailable, ignore */ }
+    } catch (e) { /* storage unavailable */ }
+    // Store raw datasets separately — skip if too large (>3MB serialized)
+    try {
+      const rawJson = JSON.stringify(state.rawDatasets);
+      if (rawJson.length < 3 * 1024 * 1024) {
+        localStorage.setItem(STORAGE_RAW, rawJson);
+      } else {
+        // Too large: store only headers (enough to show column names in explorer)
+        const headersOnly = state.rawDatasets.map(d => ({
+          fileName: d.fileName, university: d.university,
+          headers: d.headers, dataRows: [] // no rows, just headers
+        }));
+        localStorage.setItem(STORAGE_RAW, JSON.stringify(headersOnly));
+      }
+    } catch (e) {
+      try { localStorage.removeItem(STORAGE_RAW); } catch (_) {}
+    }
   }
 
   function resetAll() {
     try {
       localStorage.removeItem(STORAGE_RECORDS);
       localStorage.removeItem(STORAGE_DATASETS);
+      localStorage.removeItem(STORAGE_RAW);
       localStorage.removeItem(STORAGE_VERSION);
     } catch (e) {}
     state.records = [];

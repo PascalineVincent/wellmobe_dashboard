@@ -1351,8 +1351,14 @@ const Dashboard = (() => {
       `<option value="r|${c.colIndex}" ${_explorerState.colIndex===c.colIndex&&_explorerState.source==="raw"?"selected":""}>${DE.escapeHtml(c.label)}</option>`
     ).join("");
 
+    const headersOnlyMode = relevantRaw.length > 0 &&
+      relevantRaw.every(d => d.dataRows.length === 0);
+
     container.innerHTML = sectionHeader("Variable Explorer",
       "Explore any variable from your Excel file: select a column to see its distribution and breakdown by mobility group. \"Raw variables\" are the original questionnaire columns as they appear in your Excel file; \"Derived variables\" are computed by the tool (normalized grades, vulnerability score, groups, etc.).") +
+      (headersOnlyMode ? `<div class="info-box warn" style="margin-bottom:14px;">
+        <strong>Raw variable values are not available after a page reload</strong> (the file was too large to keep in the browser cache). Column <em>names</em> are shown in the selector but charts will not display. To restore full access to raw variables, go to <strong>Data → Reset</strong> and re-import your file.
+      </div>` : "") +
       `<div class="card" style="margin-bottom:18px;">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <label style="font-weight:700;color:var(--navy);white-space:nowrap;">Select a variable:</label>
@@ -1418,6 +1424,18 @@ const Dashboard = (() => {
       }
       const hdr = dataset.headers.find(h=>h.colIndex===colIdx);
       label = hdr ? hdr.label : `Column ${colIdx+1}`;
+
+      if (dataset.dataRows.length === 0) {
+        // Headers-only fallback: raw data was too large to store
+        container.innerHTML = `<div class="info-box warn">
+          <strong>Column: ${DE.escapeHtml(label)}</strong><br>
+          Raw data rows were not retained after the last page reload (the file was too large to store in the browser).
+          The column name is shown but values cannot be displayed.<br><br>
+          <strong>To see the full distribution:</strong> go to the <em>Data</em> tab → <em>Reset</em>, then re-import your file.
+          Raw data will then be available until the next page reload.
+        </div>`;
+        return;
+      }
       values = dataset.dataRows.map(r => (r && r[colIdx] !== undefined) ? r[colIdx] : null);
 
       // For by-group breakdown, we need to align raw rows with processed records
