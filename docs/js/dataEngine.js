@@ -322,6 +322,104 @@ const DataEngine = (() => {
     });
   }
 
+  // Extract ALL columns from a sheet for the variable explorer
+  // Returns: { headers: [{colIndex, label}], rows: Array<Array> }
+  function extractAllColumns(rows) {
+    if (!rows || rows.length === 0) return { headers: [], dataRows: [] };
+    const headerRow = rows[0] || [];
+    const nCols = Math.max(...rows.slice(0, 10).map(r => (r || []).length), headerRow.length);
+    const headers = [];
+    for (let c = 0; c < nCols; c++) {
+      const raw = headerRow[c];
+      const label = (raw !== null && raw !== undefined && normStr(raw) !== "")
+        ? normStr(raw) : `Column ${c + 1}`;
+      headers.push({ colIndex: c, label });
+    }
+    const dataRows = rows.slice(1).filter(r =>
+      r && r.some(v => v !== null && v !== undefined && normStr(v) !== "")
+    );
+    return { headers, dataRows };
+  }
+
+  // Auto-detect column type and compute distribution from raw values
+  function analyzeColumn(values) {
+    const clean = values.filter(v => v !== null && v !== undefined && normStr(v) !== "");
+    const n = values.length;
+    const nValid = clean.length;
+    const pctMissing = n > 0 ? Math.round((n - nValid) / n * 100) : 0;
+
+    if (nValid === 0) return { type: "empty", n, nValid, pctMissing };
+
+    // Check if all valid values are numeric
+    const numVals = clean.map(v => {
+      if (typeof v === "number") return isFinite(v) ? v : null;
+      const s = normStr(v).replace(",", ".");
+      const n2 = parseFloat(s);
+      return isFinite(n2) ? n2 : null;
+    }).filter(v => v !== null);
+
+    const allNumeric = numVals.length === nValid;
+    const uniqueVals = [...new Set(clean.map(v => normStr(v)))];
+    const nUnique = uniqueVals.length;
+
+    // Likert: numeric, 1-5 only, at most 5 distinct values
+    if (allNumeric && numVals.every(v => v >= 1 && v <= 5) && nUnique <= 5) {
+      const counts = {1:0,2:0,3:0,4:0,5:0};
+      numVals.forEach(v => { const k = Math.round(v); if (k>=1&&k<=5) counts[k]++; });
+      return {
+        type: "likert", n, nValid, pctMissing,
+        mean: mean(numVals), sd: sd(numVals),
+        counts, pct: Object.fromEntries(Object.entries(counts).map(([k,v])=>[k, nValid>0?v/nValid*100:0]))
+      };
+    }
+
+    // Numeric continuous
+    if (allNumeric && nUnique > 5) {
+      const mn = Math.min(...numVals), mx = Math.max(...numVals);
+      const step = (mx - mn) / 5 || 1;
+      const buckets = Array(5).fill(0);
+      const bLabels = Array.from({length:5}, (_,i) => {
+        const lo = mn + i*step, hi = mn + (i+1)*step;
+        return `${lo.toFixed(1)}–${hi.toFixed(1)}`;
+      });
+      numVals.forEach(v => {
+        const i = Math.min(4, Math.floor((v - mn) / step));
+        buckets[i]++;
+      });
+      return {
+        type: "numeric", n, nValid, pctMissing,
+        mean: mean(numVals), sd: sd(numVals),
+        min: mn, max: mx, buckets, bLabels
+      };
+    }
+
+    // Binary yes/no
+    const yesLike = new Set(["yes","oui","1","true","vrai","2"]);
+    const noLike  = new Set(["no","non","0","false","faux"]);
+    const lowerVals = clean.map(v => normStr(v).toLowerCase());
+    if (lowerVals.every(v => yesLike.has(v) || noLike.has(v))) {
+      const nYes = lowerVals.filter(v => yesLike.has(v)).length;
+      const nNo  = lowerVals.filter(v => noLike.has(v)).length;
+      return {
+        type: "binary", n, nValid, pctMissing,
+        counts: { Yes: nYes, No: nNo },
+        pct: { Yes: nValid>0?nYes/nValid*100:0, No: nValid>0?nNo/nValid*100:0 }
+      };
+    }
+
+    // Categorical (few distinct values) or free text
+    const catType = nUnique <= 30 ? "category" : "text";
+    const counts = {};
+    clean.forEach(v => { const k = normStr(v); counts[k] = (counts[k]||0)+1; });
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    return {
+      type: catType, n, nValid, pctMissing, nUnique,
+      counts: Object.fromEntries(sorted),
+      pct: Object.fromEntries(sorted.map(([k,v])=>[k, nValid>0?v/nValid*100:0])),
+      topValues: sorted.slice(0, 20)
+    };
+  }
+
   // ---------------------------------------------------------
   // Basic statistics
   // ---------------------------------------------------------
@@ -616,6 +714,6 @@ const DataEngine = (() => {
     mean, sd, se, meanSE,
     kruskalWallis, mannWhitneyU, chiSquareTest, chisqP,
     countBy, crossCount, meanByGroup, likertDistribution, validLikertCols,
-    escapeHtml,
+    escapeHtml, extractAllColumns, analyzeColumn,
   };
 })();

@@ -15,7 +15,8 @@
   const state = {
     config: null,
     records: [],
-    datasets: [], // {fileName, university, n}
+    datasets: [],    // {fileName, university, n}
+    rawDatasets: [], // {fileName, university, headers, dataRows} for variable explorer
     uploadQueue: [], // {fileName, sheets, sheetNames, selectedSheet}
     activeTab: "overview",
     selectedUniversity: "ALL",
@@ -48,7 +49,7 @@
   // ---------------------------------------------------------
 
   async function init() {
-    const res = await fetch("config/config.json?v=9");
+    const res = await fetch("config/config.json?v=10");
     state.config = await res.json();
     Dashboard.init(state.config);
 
@@ -120,6 +121,7 @@
     } catch (e) {}
     state.records = [];
     state.datasets = [];
+    state.rawDatasets = [];
     state.uploadQueue = [];
     state.selectedUniversity = "ALL";
     state.compare = false;
@@ -342,10 +344,13 @@
 
     state.records = state.records.concat(records);
 
+    // Store raw rows for variable explorer (all columns, not just mapped ones)
+    const { headers, dataRows } = DE.extractAllColumns(rows);
     const universities = {};
     records.forEach((r) => { universities[r.University] = (universities[r.University] || 0) + 1; });
     Object.keys(universities).forEach((u) => {
       state.datasets.push({ fileName: item.fileName, university: u, n: universities[u] });
+      state.rawDatasets.push({ fileName: item.fileName, university: u, headers, dataRows });
     });
 
     state.uploadQueue.shift();
@@ -450,6 +455,7 @@
     document.getElementById("section-" + state.activeTab).classList.add("active");
     Dashboard.render(state.activeTab, {
       records: state.records,
+      rawDatasets: state.rawDatasets,
       selectedUniversity: state.selectedUniversity,
       compare: state.compare,
     });

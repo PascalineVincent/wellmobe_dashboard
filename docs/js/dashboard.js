@@ -1281,6 +1281,282 @@ const Dashboard = (() => {
   // ===========================================================
   // registry
   // ===========================================================
+
+  // ===========================================================
+  // Variable Explorer
+  // ===========================================================
+
+  // Persistent state for the explorer (survives tab switches)
+  const _explorerState = { colIndex: null, source: "raw" };
+
+  function renderExplorer(ctx) {
+    const { all, base, compareActive, sel } = getCtxData(ctx);
+    const container = document.getElementById("section-explorer");
+    const rawDatasets = ctx.rawDatasets || [];
+
+    // ── Build column list ──────────────────────────────────
+    // Merge headers across all loaded raw datasets for the selected university
+    // (or all if ALL)
+    const relevantRaw = sel === "ALL"
+      ? rawDatasets
+      : rawDatasets.filter(d => d.university === sel);
+
+    // Derived variables from processed records
+    const DERIVED = [
+      { colIndex: "d_groupe",           label: "Group (derived)",                    source: "derived" },
+      { colIndex: "d_moyenne_acad_norm", label: "Academic grade normalized 0-10",     source: "derived" },
+      { colIndex: "d_revenu_num",        label: "Household income (ordinal 1-8)",     source: "derived" },
+      { colIndex: "d_educ_num",          label: "Parental education (ordinal 1-6)",   source: "derived" },
+      { colIndex: "d_english_cert",      label: "English level (ordinal 0=None..6=C2)", source: "derived" },
+      { colIndex: "d_english_certified", label: "Certified English B2+ (0/1)",       source: "derived" },
+      { colIndex: "d_score_intl",        label: "International profile score (0-10)", source: "derived" },
+      { colIndex: "d_score_vuln",        label: "Structural Vulnerability Index (0-10)", source: "derived" },
+      { colIndex: "d_psy_openness",      label: "Psychological: International openness", source: "derived" },
+      { colIndex: "d_psy_efficacy",      label: "Psychological: Personal efficacy",  source: "derived" },
+      { colIndex: "d_score_frein_simple",label: "Composite barrier score",           source: "derived" },
+      { colIndex: "d_aisance_fin",       label: "Financial comfort (1=comfortable, 5=not at all)", source: "derived" },
+      { colIndex: "d_depense_imp",       label: "Can absorb €1k expense (0/1)",      source: "derived" },
+      { colIndex: "d_scholarship",       label: "Scholarship (0/1)",                 source: "derived" },
+      { colIndex: "d_parental_erasmus",  label: "Parental Erasmus (Yes/No)",         source: "derived" },
+    ];
+
+    // Build merged headers from raw data (deduplicated by label)
+    let rawHeaders = [];
+    if (relevantRaw.length > 0) {
+      // Use headers from the first matching dataset; if multiple, take the one with most columns
+      const best = relevantRaw.reduce((a,b)=>b.headers.length>a.headers.length?b:a, relevantRaw[0]);
+      rawHeaders = best.headers.map(h => ({ ...h, source: "raw", datasetRef: best }));
+    }
+
+    const allCols = [...DERIVED, ...rawHeaders];
+
+    if (allCols.length === 0) {
+      container.innerHTML = sectionHeader("Variable Explorer", "") +
+        emptyState("No data loaded. Please import an Excel file first.");
+      return;
+    }
+
+    // ── Init state ─────────────────────────────────────────
+    if (_explorerState.colIndex === null) {
+      _explorerState.colIndex = allCols[0].colIndex;
+      _explorerState.source = allCols[0].source;
+    }
+
+    // ── Build selector options ─────────────────────────────
+    const derivedOpts = DERIVED.map(c =>
+      `<option value="d|${c.colIndex}" ${_explorerState.colIndex===c.colIndex&&_explorerState.source==="derived"?"selected":""}>${DE.escapeHtml(c.label)}</option>`
+    ).join("");
+
+    const rawOpts = rawHeaders.map(c =>
+      `<option value="r|${c.colIndex}" ${_explorerState.colIndex===c.colIndex&&_explorerState.source==="raw"?"selected":""}>${DE.escapeHtml(c.label)}</option>`
+    ).join("");
+
+    container.innerHTML = sectionHeader("Variable Explorer",
+      "Explore any variable from your Excel file: select a column to see its distribution and breakdown by mobility group. \"Raw variables\" are the original questionnaire columns as they appear in your Excel file; \"Derived variables\" are computed by the tool (normalized grades, vulnerability score, groups, etc.).") +
+      `<div class="card" style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <label style="font-weight:700;color:var(--navy);white-space:nowrap;">Select a variable:</label>
+          <select id="explorer-col-select" style="font-family:inherit;font-size:0.9rem;padding:8px 12px;border-radius:8px;border:1px solid var(--border);flex:1;min-width:260px;max-width:600px;">
+            <optgroup label="── Derived variables (computed by the tool)">${derivedOpts}</optgroup>
+            ${rawOpts.length ? `<optgroup label="── Raw questionnaire variables (from your Excel file)">${rawOpts}</optgroup>` : ""}
+          </select>
+        </div>
+      </div>
+      <div id="explorer-content"></div>`;
+
+    // Event listener
+    document.getElementById("explorer-col-select").addEventListener("change", function() {
+      const [src, idx] = this.value.split("|");
+      _explorerState.source = src === "d" ? "derived" : "raw";
+      _explorerState.colIndex = src === "d" ? idx : parseInt(idx);
+      renderExplorerContent(ctx, rawDatasets, relevantRaw, sel);
+    });
+
+    renderExplorerContent(ctx, rawDatasets, relevantRaw, sel);
+  }
+
+  function renderExplorerContent(ctx, rawDatasets, relevantRaw, sel) {
+    const { base, all, compareActive } = getCtxData(ctx);
+    const container = document.getElementById("explorer-content");
+    if (!container) return;
+
+    const order = CFG.groups.order, labels = CFG.groups.labels;
+    const src = _explorerState.source;
+    const cidx = _explorerState.colIndex;
+
+    // ── Get values ─────────────────────────────────────────
+    let values = [], label = "";
+    let byGroup = {}; // group → array of values
+
+    if (src === "derived") {
+      // Map derived key to record field
+      const fieldMap = {
+        "d_groupe": "groupe", "d_moyenne_acad_norm": "moyenne_acad_norm",
+        "d_revenu_num": "revenu_num", "d_educ_num": "educ_num",
+        "d_english_cert": "english_cert", "d_english_certified": "english_certified",
+        "d_score_intl": "score_intl", "d_score_vuln": "score_vuln",
+        "d_psy_openness": "psy_openness", "d_psy_efficacy": "psy_efficacy",
+        "d_score_frein_simple": "score_frein_simple", "d_aisance_fin": "aisance_fin",
+        "d_depense_imp": "depense_imp", "d_scholarship": "scholarship",
+        "d_parental_erasmus": "parental_erasmus",
+      };
+      const field = fieldMap[cidx] || cidx.replace("d_","");
+      label = document.getElementById("explorer-col-select")
+        ? document.getElementById("explorer-col-select").options[document.getElementById("explorer-col-select").selectedIndex].text
+        : field;
+      values = base.map(r => r[field]);
+      order.forEach(g => { byGroup[g] = base.filter(r=>r.groupe===g).map(r=>r[field]); });
+    } else {
+      // Raw column
+      const colIdx = parseInt(cidx);
+      const dataset = relevantRaw.length > 0
+        ? relevantRaw.reduce((a,b)=>b.headers.length>a.headers.length?b:a, relevantRaw[0])
+        : null;
+      if (!dataset) {
+        container.innerHTML = emptyState("Raw data not available for this selection — please re-import your file.");
+        return;
+      }
+      const hdr = dataset.headers.find(h=>h.colIndex===colIdx);
+      label = hdr ? hdr.label : `Column ${colIdx+1}`;
+      values = dataset.dataRows.map(r => (r && r[colIdx] !== undefined) ? r[colIdx] : null);
+
+      // For by-group breakdown, we need to align raw rows with processed records
+      // Use the University filter from processed records as a proxy row count
+      // Since raw rows and records are aligned 1-to-1 (same sheet, same order), use index
+      const recBase = sel === "ALL" ? ctx.records : ctx.records.filter(r=>r.University===sel);
+      // Align: processed records come from the same raw rows (1-to-1 after header skip)
+      // rawDatasets store dataRows (without header), records processed in same order
+      // Build a grouped map using the record groupe field aligned by position
+      if (recBase.length === values.length) {
+        order.forEach(g => {
+          byGroup[g] = recBase
+            .map((r, i) => r.groupe === g ? values[i] : undefined)
+            .filter(v => v !== undefined);
+        });
+      } else {
+        order.forEach(g => { byGroup[g] = []; });
+      }
+    }
+
+    const analysis = DE.analyzeColumn(values);
+    const isNumericLike = ["numeric","likert"].includes(analysis.type);
+
+    // ── Summary stats ──────────────────────────────────────
+    const pctValid = analysis.n > 0 ? Math.round(analysis.nValid/analysis.n*100) : 0;
+    let statsHtml = `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px;font-size:0.85rem;">
+      <span><strong>${analysis.n}</strong> total rows</span>
+      <span><strong>${analysis.nValid}</strong> valid (${pctValid}%)</span>
+      <span><strong>${analysis.pctMissing}%</strong> missing</span>
+      ${analysis.mean!==undefined&&analysis.mean!==null?`<span><strong>Mean: ${analysis.mean.toFixed(2)}</strong>${analysis.sd!==undefined&&analysis.sd!==null?` ± ${analysis.sd.toFixed(2)} (SD)`:""}</span>`:""}
+      ${analysis.type==="category"||analysis.type==="binary"?`<span><strong>${analysis.nUnique||2}</strong> distinct values</span>`:""}
+    </div>`;
+
+    // ── Chart ──────────────────────────────────────────────
+    let chartHtml = "", byGroupHtml = "";
+
+    if (analysis.type === "empty" || analysis.type === "text") {
+      chartHtml = `<div class="card"><h3>${DE.escapeHtml(label)}</h3>
+        <div class="info-box warn">This column contains free text or too many distinct values to chart meaningfully.
+        ${analysis.nUnique?`There are ${analysis.nUnique} distinct values.`:""}</div>
+        ${analysis.topValues&&analysis.topValues.length?`<p class="card-note"><strong>Most frequent values:</strong> ${analysis.topValues.slice(0,5).map(([v,c])=>`"${DE.escapeHtml(v)}" (${c})`).join(", ")}</p>`:""}
+      </div>`;
+    } else {
+      chartHtml = `<div class="grid">
+        <div class="card"><h3>${DE.escapeHtml(label)} — overall distribution</h3>
+          <p class="card-note">${explorerTypeLabel(analysis.type)} · ${analysis.nValid} valid responses</p>
+          <div class="chart-wrap h-260"><canvas id="chart-explorer-main"></canvas></div>
+        </div>
+        <div class="card"><h3>${DE.escapeHtml(label)} — by mobility group</h3>
+          <p class="card-note">Mean (numeric/likert) or most frequent value (categorical) per group</p>
+          <div class="chart-wrap h-260"><canvas id="chart-explorer-groups"></canvas></div>
+        </div>
+      </div>`;
+    }
+
+    container.innerHTML = `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--accent);">
+      <h3>${DE.escapeHtml(label)}</h3>
+      <p class="card-note" style="font-size:0.78rem;">${explorerTypeLabel(analysis.type)} · column ${src==="raw"?"#"+(parseInt(cidx)+1)+" in your Excel file":"derived by the tool"}</p>
+      ${statsHtml}
+    </div>
+    ${chartHtml}`;
+
+    // ── Draw charts ────────────────────────────────────────
+    if (analysis.type !== "empty" && analysis.type !== "text") {
+      const mainCanvas = document.getElementById("chart-explorer-main");
+      const grpCanvas  = document.getElementById("chart-explorer-groups");
+
+      if (analysis.type === "likert") {
+        if (mainCanvas) Charts.barChart(mainCanvas,
+          ["1","2","3","4","5"],
+          [1,2,3,4,5].map(k=>analysis.pct[k]||0),
+          { colors:[CFG.likertPalette["1"],CFG.likertPalette["2"],CFG.likertPalette["3"],CFG.likertPalette["4"],CFG.likertPalette["5"]], max:100 });
+
+        if (grpCanvas) {
+          const means = order.map(g => {
+            const v = byGroup[g].map(x=>typeof x==="number"?x:parseFloat(x)).filter(x=>isFinite(x)&&x>=1&&x<=5);
+            return v.length ? DE.mean(v) : null;
+          });
+          Charts.groupedBarChart(grpCanvas, order.map(g=>labels[g]),
+            [{ label:"Mean", data:means, color:order.map(g=>CFG.groups.colors[g]) }],
+            { max:5 });
+        }
+      } else if (analysis.type === "numeric") {
+        if (mainCanvas) Charts.barChart(mainCanvas, analysis.bLabels, analysis.buckets,
+          { colors:COLOR_BASE, horizontal:true });
+
+        if (grpCanvas) {
+          const means = order.map(g => {
+            const v = byGroup[g].map(x=>typeof x==="number"?x:parseFloat(x)).filter(x=>isFinite(x));
+            return v.length ? DE.mean(v) : null;
+          });
+          Charts.groupedBarChart(grpCanvas, order.map(g=>labels[g]),
+            [{ label:"Mean", data:means, color:order.map(g=>CFG.groups.colors[g]) }], {});
+        }
+      } else if (analysis.type === "binary") {
+        if (mainCanvas) Charts.barChart(mainCanvas, ["Yes","No"],
+          [analysis.pct.Yes||0, analysis.pct.No||0],
+          { colors:[CFG.yesNoColors.Yes, CFG.yesNoColors.No], max:100 });
+
+        if (grpCanvas) {
+          const yesPcts = order.map(g => {
+            const v = byGroup[g].map(x=>DE.normLower(x));
+            const ny = v.filter(x=>CFG.yesValues.includes(x)).length;
+            return v.length ? ny/v.length*100 : null;
+          });
+          Charts.groupedBarChart(grpCanvas, order.map(g=>labels[g]),
+            [{ label:"% Yes", data:yesPcts, color:order.map(g=>CFG.groups.colors[g]) }],
+            { max:100 });
+        }
+      } else if (analysis.type === "category") {
+        const topCats = analysis.topValues.slice(0,12);
+        const catLabels = topCats.map(([v])=>v);
+        const catPcts   = topCats.map(([,c])=>analysis.nValid>0?c/analysis.nValid*100:0);
+
+        if (mainCanvas) Charts.barChart(mainCanvas, catLabels, catPcts,
+          { colors:COLOR_BASE, max:100, horizontal:true });
+
+        if (grpCanvas) {
+          // For each group: distribution across top categories
+          const datasets = order.map(g => {
+            const gv = byGroup[g].map(x=>DE.normStr(x));
+            const gn = gv.length || 1;
+            return {
+              label: labels[g],
+              data: catLabels.map(cat => gv.filter(x=>x===cat).length/gn*100),
+              color: CFG.groups.colors[g],
+            };
+          });
+          Charts.groupedBarChart(grpCanvas, catLabels, datasets, { max:100, horizontal:true });
+        }
+      }
+    }
+  }
+
+  function explorerTypeLabel(type) {
+    return { numeric:"Continuous numeric", likert:"Likert scale (1-5)",
+      binary:"Binary (Yes/No)", category:"Categorical", text:"Free text", empty:"Empty/no data" }[type] || type;
+  }
+
   const SECTIONS = [
     { id: "overview",      label: "Overview",             render: renderOverview },
     { id: "socio",         label: "Socio-demographics",   render: renderSocio },
@@ -1294,6 +1570,7 @@ const Dashboard = (() => {
     { id: "vulnerability", label: "Vulnerability Index",  render: renderVulnerability },
     { id: "universities",  label: "Universities",         render: renderUniversities },
     { id: "stats",         label: "Statistical tests",    render: renderStats },
+    { id: "explorer",      label: "🔍 Variable Explorer", render: renderExplorer },
     { id: "warnings",      label: "⚠️ Policy Warnings",  render: renderWarnings },
     { id: "about",         label: "About",                render: renderAbout },
   ];
