@@ -232,17 +232,23 @@ const DataEngine = (() => {
     // ordinal
     rec.revenu_num = mapOrdinal(raw.revenu_foyer, config.incomeCategories, true);
     rec.educ_num = mapOrdinal(raw.educ_parents, config.educationCategories, false);
-    // pays_num: number of European countries visited (1=4+, 5=0) — inverted scale, high=constrained
-    // Tries ordinal mapping first, then direct numeric
-    rec.pays_num = mapOrdinal(raw.pays_num, config.paysCategories || ["4","3","2","1","0"], false)
-      || (raw.pays_num !== null && raw.pays_num !== undefined && raw.pays_num !== ""
-          ? Math.min(5, Math.max(1, 6 - Math.round(Number(String(raw.pays_num).replace(/[^0-9.]/g,"")) || 0)))
-          : null);
-    // lang_num: number of foreign languages spoken (1=4+, 5=0) — inverted scale
-    rec.lang_num = mapOrdinal(raw.lang_num, config.langCategories || ["4","3","2","1","0"], false)
-      || (raw.lang_num !== null && raw.lang_num !== undefined && raw.lang_num !== ""
-          ? Math.min(5, Math.max(1, 6 - Math.round(Number(String(raw.lang_num).replace(/[^0-9.]/g,"")) || 0)))
-          : null);
+    // pays_num / lang_num — exact replication of R case_when recodings:
+    // none/zero/0 → 5 | one/1 → 4 | two/2 → 3 | three/3 → 2 | four+/4-9 → 1 | NA
+    function _recode_ordinal_inv(raw_val) {
+      if (raw_val === null || raw_val === undefined || raw_val === "") return null;
+      const s = String(raw_val).trim().toLowerCase();
+      if (/none|zero|^0$/.test(s))              return 5;
+      if (/^one$|^1$/.test(s))                  return 4;
+      if (/^two$|^2$/.test(s))                  return 3;
+      if (/^three$|^3$/.test(s))                return 2;
+      if (/four|more|[4-9]/.test(s))            return 1;
+      // fallback: try numeric
+      const n = parseInt(s, 10);
+      if (!isNaN(n)) return n === 0 ? 5 : n === 1 ? 4 : n === 2 ? 3 : n === 3 ? 2 : n >= 4 ? 1 : null;
+      return null;
+    }
+    rec.pays_num = _recode_ordinal_inv(raw.pays_num);
+    rec.lang_num = _recode_ordinal_inv(raw.lang_num);
     rec.english_cert = matchEnglishLevel(raw.english_cert, config);
     rec.english_certified = rec.english_cert === null ? null :
       (rec.english_cert >= config.englishLevels.indexOf(config.englishCertifiedFrom) ? 1 : 0);

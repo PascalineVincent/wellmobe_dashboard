@@ -1406,31 +1406,72 @@ const Dashboard = (() => {
   // M. Structural Vulnerability Index
   // ===========================================================
   function renderVulnerability(ctx) {
-    const { base, multiMode, unis } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-vulnerability");
+    const PAL = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
 
     if (base.length === 0) {
-      container.innerHTML = sectionHeader("Structural Vulnerability Index", "") +
+      container.innerHTML = sectionHeader("Structural Vulnerability Index", "", "rk_vulnerability") +
         emptyState("No data for this selection.");
       return;
     }
 
+    // ── Multi-university mode ─────────────────────────────────
     if (multiMode) {
-      container.innerHTML = sectionHeader("Structural Vulnerability Index",
-        "Comparing structural vulnerability across universities.", "rk_vulnerability") +
-        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+      const uniStats = unis.map((u, i) => {
+        const recs = all.filter(r => r.University === u);
+        const scores = recs.map(r => r.score_vuln).filter(v => v != null && !isNaN(v));
+        const high   = scores.filter(v => v > 6).length;
+        return {
+          u, n: recs.length, color: PAL[i % PAL.length],
+          mean:  scores.length ? DE.mean(scores)          : null,
+          pctHi: scores.length ? high / scores.length * 100 : null,
+          pctHiFmt: scores.length ? Math.round(high / scores.length * 100) + "%" : "–",
+          meanFmt: scores.length ? DE.mean(scores).toFixed(2) : "–",
+        };
+      });
+
+      const kpiHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px;">` +
+        uniStats.map(s => `<div class="card" style="border-top:3px solid ${s.color};padding:14px 16px;">
+          <div style="font-weight:700;font-size:0.82rem;color:var(--navy);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${DE.escapeHtml(s.u)}</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div><div style="font-size:1.4rem;font-weight:800;">${s.meanFmt}</div><div style="font-size:0.72rem;color:var(--gray);">mean Vi (0-10)</div></div>
+            <div><div style="font-size:1.4rem;font-weight:800;">${s.pctHiFmt}</div><div style="font-size:0.72rem;color:var(--gray);">Vi > 6</div></div>
+          </div>
+        </div>`).join("") + `</div>`;
+
+      container.innerHTML =
+        sectionHeader("Structural Vulnerability Index",
+          `V<sub>i</sub><sup>PCA</sup> = (0.459·F<sub>i</sub> + 0.142·A<sub>i</sub> + 0.240·E<sub>i</sub> + 0.159·C<sub>i</sub>) / 5 × 10. Threshold V<sub>i</sub> > 6 = "resigned non-mover".`, "rk_vulnerability") +
+        kpiHtml +
         `<div class="grid">
-          ${card("chart-vuln-mean-mu", "Mean Vi by university (0-10)", "Higher = more constrained.", "", "h-280")}
-          ${card("chart-vuln-high-mu", "% Vi > 6 (resigned non-movers) by university", "Share above critical threshold.", "", "h-280")}
-        </div>`;
-      multiUniBar("chart-vuln-mean-mu", unis, all,
-        recs => DE.mean(recs.map(r=>r.score_vuln).filter(v=>v!=null&&!isNaN(v))), { max:10 });
-      multiUniBar("chart-vuln-high-mu", unis, all,
-        recs => { const v=recs.filter(r=>r.score_vuln!=null&&!isNaN(r.score_vuln)); return v.length?v.filter(r=>r.score_vuln>6).length/v.length*100:null; }, { max:100 });
+          ${card("chart-vuln-mean-mu", "Mean Vi by university (0-10)", "Higher = more structurally constrained.", "", "h-280")}
+          ${card("chart-vuln-hi-mu",   "% Vi > 6 (resigned non-movers) by university", "Share above critical threshold.", "", "h-280")}
+        </div>
+        <div class="grid cols-1"><div class="card">
+          <h3>Summary table</h3>
+          <table class="stat-table">
+            <thead><tr><th>University</th><th class="num">n</th><th class="num">Mean Vi</th><th class="num">Vi > 6 (%)</th></tr></thead>
+            <tbody>${uniStats.map(s => `<tr>
+              <td>${DE.escapeHtml(s.u)}</td>
+              <td class="num">${s.n}</td>
+              <td class="num">${s.meanFmt}</td>
+              <td class="num" style="color:${s.pctHi!==null&&s.pctHi>40?"#C84650":s.pctHi>20?"#D27832":"#329B5A"};font-weight:700;">${s.pctHiFmt}</td>
+            </tr>`).join("")}</tbody>
+          </table>
+        </div></div>`;
+
+      const el1 = document.getElementById("chart-vuln-mean-mu");
+      const el2 = document.getElementById("chart-vuln-hi-mu");
+      if (el1) Charts.barChart(el1, unis, uniStats.map(s => s.mean),
+        { horizontal: true, colors: uniStats.map(s => s.color), max: 10 });
+      if (el2) Charts.barChart(el2, unis, uniStats.map(s => s.pctHi),
+        { horizontal: true, colors: uniStats.map(s => s.color), max: 100 });
       return;
     }
 
+    // ── Single / ALL mode ─────────────────────────────────────
     const byGroup = {};
     order.forEach(g => {
       byGroup[g] = base.filter(r => r.groupe === g)
@@ -1456,8 +1497,8 @@ const Dashboard = (() => {
       { key: "depense_imp",       label: "Can absorb €1k expense — F (1=yes)" },
       { key: "moyenne_acad_norm", label: "Academic grade inverted — A (0-10)" },
       { key: "educ_num",          label: "Parental education — E (1-6, higher=more educated)" },
-      { key: "pays_num",          label: "Countries visited inverted — C (1=4+, 5=none)" },
-      { key: "lang_num",          label: "Languages spoken inverted — C (1=4+, 5=none)" },
+      { key: "pays_num",          label: "Countries visited — C (1=4+, 5=none)" },
+      { key: "lang_num",          label: "Languages spoken — C (1=4+, 5=none)" },
     ];
 
     const resignedRow = order.map(g => {
@@ -1469,17 +1510,18 @@ const Dashboard = (() => {
 
     const mwu = DE.mannWhitneyU(byGroup["Wants to go & applied"], byGroup["Wants to go"]);
 
-    container.innerHTML = sectionHeader("Structural Vulnerability Index",
-      `V<sub>i</sub><sup>PCA</sup> = (0.459·F<sub>i</sub> + 0.142·A<sub>i</sub> + 0.240·E<sub>i</sub> + 0.159·C<sub>i</sub>) / 5 × 10 — 
-      <strong>F<sub>i</sub></strong>: financial constraint (comfort + income + expense shock); 
-      <strong>A<sub>i</sub></strong>: academic grade (inverted); 
-      <strong>E<sub>i</sub></strong>: parental education (inverted); 
-      <strong>C<sub>i</sub></strong>: cultural exposure — countries + languages (inverted). 
-      Missing → 2.5. Scale: 0 = no constraint, 10 = maximum. Threshold V<sub>i</sub> > 6 = "resigned non-mover".`) +
+    container.innerHTML =
+      sectionHeader("Structural Vulnerability Index",
+        `V<sub>i</sub><sup>PCA</sup> = (0.459·F<sub>i</sub> + 0.142·A<sub>i</sub> + 0.240·E<sub>i</sub> + 0.159·C<sub>i</sub>) / 5 × 10 —
+        <strong>F<sub>i</sub></strong>: financial constraint (comfort + income + expense shock);
+        <strong>A<sub>i</sub></strong>: academic grade (inverted);
+        <strong>E<sub>i</sub></strong>: parental education (inverted);
+        <strong>C<sub>i</sub></strong>: cultural exposure — countries + languages (inverted).
+        Missing → 2.5. Scale 0–10. Threshold V<sub>i</sub> > 6 = "resigned non-mover".`, "rk_vulnerability") +
       `<div class="grid">
-        ${card("chart-vuln-means", "V\u1d62 by group — mean \u00b1 SE",
+        ${card("chart-vuln-means", "Vᵢ by group — mean ± SE",
           `Mean ± SE per mobility group. G2 vs G3: ${sigBadge(mwu.p)} (Mann-Whitney).`)}
-        ${card("chart-vuln-dist", "V\u1d62 distribution by group — score brackets (%)",
+        ${card("chart-vuln-dist", "Vᵢ distribution by group — score brackets (%)",
           "Share of each group in each vulnerability bracket (0–2 = low, 8–10 = very high).", "", "h-300")}
       </div>
       <div class="grid cols-1"><div class="card">
@@ -1499,7 +1541,7 @@ const Dashboard = (() => {
       </div></div>
       <div class="grid cols-1"><div class="card">
         <h3>Sub-component means by group</h3>
-        <p class="card-note">Raw variable means per group. Financial comfort: 1 = very comfortable, 5 = not at all; household income: 1–8; ability to absorb €1k expense: 1 = yes, 0 = no; academic grade: 0–10; parental education: 1–6.</p>
+        <p class="card-note">Raw variable means per group.</p>
         <table class="stat-table">
           <thead><tr><th>Variable</th>${order.map(g => `<th class="num">${labels[g]}</th>`).join("")}</tr></thead>
           <tbody>${subcomps.map(sc => {
@@ -1512,13 +1554,14 @@ const Dashboard = (() => {
         </table>
       </div></div>`;
 
-    Charts.groupedBarChart(document.getElementById("chart-vuln-means"),
+    const cv1 = document.getElementById("chart-vuln-means");
+    const cv2 = document.getElementById("chart-vuln-dist");
+    if (cv1) Charts.groupedBarChart(cv1,
       order.map(g => labels[g]),
-      [{ label: "Mean V\u1d62", data: groupMeans, errorBars: groupSE,
+      [{ label: "Mean Vᵢ", data: groupMeans, errorBars: groupSE,
          color: order.map(g => CFG.groups.colors[g]) }],
       { max: 10 });
-
-    Charts.groupedBarChart(document.getElementById("chart-vuln-dist"),
+    if (cv2) Charts.groupedBarChart(cv2,
       order.map(g => labels[g]),
       bLabels.map((bl, bi) => ({
         label: bl,
@@ -1527,6 +1570,7 @@ const Dashboard = (() => {
       })),
       { max: 100 });
   }
+
 
   // ===========================================================
   // registry
