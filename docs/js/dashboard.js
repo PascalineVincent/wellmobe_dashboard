@@ -88,7 +88,9 @@ const Dashboard = (() => {
       const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
       return palette[i % palette.length];
     });
-    Charts.barChart(document.getElementById(canvasId), unis, vals,
+    const _cvs = document.getElementById(canvasId);
+    if (!_cvs) return;
+    Charts.barChart(_cvs, unis, vals,
       Object.assign({ horizontal: true, colors }, opts));
   }
   // Multi-university grouped bar: one series per university, categories = groups
@@ -100,7 +102,9 @@ const Dashboard = (() => {
       data: categories.map(cat => catFn(all.filter(r => r.University === u), cat)),
       color: palette[i % palette.length],
     }));
-    Charts.groupedBarChart(document.getElementById(canvasId), categories, datasets, opts);
+    const _cvs2 = document.getElementById(canvasId);
+    if (!_cvs2) return;
+    Charts.groupedBarChart(_cvs2, categories, datasets, opts);
   }
 
   function pctOf(records, field, value) {
@@ -171,74 +175,97 @@ const Dashboard = (() => {
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const colors = order.map((g) => CFG.groups.colors[g]);
     const container = document.getElementById("section-overview");
+    const PAL = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
 
-    const n = base.length;
-    const wantsToGo = base.filter((r) => r.profil === "Yes").length;
-    const applied = base.filter((r) => r.a_postule === "Yes").length;
-    const alreadyGone = base.filter((r) => r.a_participe === "Yes").length;
-
-    const counts = DE.countBy(base, "groupe");
-    const pctBase = order.map((g) => (n ? ((counts[g] || 0) / n) * 100 : 0));
-    let pctAll = null;
-    if (compareActive) {
-      const countsAll = DE.countBy(all, "groupe");
-      const nAll = all.length;
-      pctAll = order.map((g) => (nAll ? ((countsAll[g] || 0) / nAll) * 100 : 0));
+    // ── KPI block ─────────────────────────────────────────────
+    let kpiHtml;
+    if (multiMode) {
+      kpiHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px;">` +
+        unis.map((u, i) => {
+          const recs = all.filter(r => r.University === u);
+          const nn = recs.length;
+          const wtg  = recs.filter(r => r.profil === "Yes").length;
+          const gone = recs.filter(r => r.a_participe === "Yes").length;
+          return `<div class="card" style="border-top:3px solid ${PAL[i % PAL.length]};padding:14px 16px;">
+            <div style="font-weight:700;font-size:0.82rem;color:var(--navy);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${DE.escapeHtml(u)}</div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+              <div><div style="font-size:1.5rem;font-weight:800;color:var(--navy);">${nn}</div><div style="font-size:0.72rem;color:var(--gray);">respondents</div></div>
+              <div><div style="font-size:1.5rem;font-weight:800;color:var(--navy);">${fmtPct(nn ? wtg/nn*100 : null)}</div><div style="font-size:0.72rem;color:var(--gray);">want to go</div></div>
+              <div><div style="font-size:1.5rem;font-weight:800;color:var(--navy);">${fmtPct(nn ? gone/nn*100 : null)}</div><div style="font-size:0.72rem;color:var(--gray);">already gone</div></div>
+            </div>
+          </div>`;
+        }).join("") + `</div>`;
+    } else {
+      const n = base.length;
+      const wantsToGo  = base.filter(r => r.profil === "Yes").length;
+      const alreadyGone = base.filter(r => r.a_participe === "Yes").length;
+      kpiHtml = `<div class="grid cols-3">
+        ${kpi(n, "Respondents" + (compareActive ? " (selected)" : ""))}
+        ${kpi(fmtPct(n ? wantsToGo/n*100 : null), "Want to go on mobility")}
+        ${kpi(fmtPct(n ? alreadyGone/n*100 : null), "Have already gone")}
+      </div>`;
     }
 
-    container.innerHTML = sectionHeader("Overview",
-      "This section presents the overall composition of the sample: the share of respondents in each of the four mobility profiles (already gone, wants to go and has applied, wants to go without having applied, does not want to go), and the conversion funnel between these stages.") +
+    // ── HTML shell ────────────────────────────────────────────
+    container.innerHTML =
+      sectionHeader("Overview",
+        "Overall composition of the sample across the four mobility profiles, and conversion funnel.", "rk_overview") +
       (compareActive ? legendBar() : "") +
-      `<div class="grid cols-3">
-        ${kpi(n, "Respondents" + (compareActive ? " (selected university)" : ""))}
-        ${kpi(fmtPct(n ? (wantsToGo / n) * 100 : null), "Want to go on mobility")}
-        ${kpi(fmtPct(n ? (alreadyGone / n) * 100 : null), "Have already gone")}
-      </div>
-      <div class="grid">
-        ${card("chart-ov-groups", "Distribution across four groups", "Share of each mobility profile in the sample.")}
-        ${card("chart-ov-funnel", "Mobility funnel", "From the total number of respondents to those who want to go, have applied, and have actually gone.")}
+      kpiHtml +
+      `<div class="grid">
+        ${card("chart-ov-groups",
+          multiMode ? "Group distribution by university (%)" : "Distribution across four groups",
+          multiMode ? "One series per university." : "Share of each mobility profile.")}
+        ${card("chart-ov-funnel",
+          multiMode ? "Mobility funnel by university" : "Mobility funnel",
+          multiMode ? "Absolute counts per university." : "From respondents to those who went.")}
       </div>`;
 
-    const labelArr = order.map((g) => labels[g]);
+    // ── Charts ────────────────────────────────────────────────
+    const labelArr = order.map(g => labels[g]);
+    const cvs1 = document.getElementById("chart-ov-groups");
+    const cvs2 = document.getElementById("chart-ov-funnel");
+    if (!cvs1 || !cvs2) return;
 
     if (multiMode) {
-      // Multi-university mode: one series per university
-      const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
       const datasets = unis.map((u, i) => {
         const recs = all.filter(r => r.University === u);
         const cnt = DE.countBy(recs, "groupe");
         const nn = recs.length;
-        return { label: u, data: order.map(g => nn ? (cnt[g]||0)/nn*100 : 0), color: palette[i%palette.length] };
+        return { label: u, data: order.map(g => nn ? (cnt[g]||0)/nn*100 : 0), color: PAL[i%PAL.length] };
       });
-      Charts.groupedBarChart(document.getElementById("chart-ov-groups"), labelArr, datasets, { max: 100 });
-      // Funnel: grouped by university
-      const funnelDatasets = unis.map((u, i) => {
+      Charts.groupedBarChart(cvs1, labelArr, datasets, { max: 100 });
+      const fd = unis.map((u, i) => {
         const recs = all.filter(r => r.University === u);
-        const nn = recs.length;
-        return { label: u,
-          data: [nn,
-            recs.filter(r => r.profil==="Yes").length,
-            recs.filter(r => r.a_postule==="Yes").length,
-            recs.filter(r => r.a_participe==="Yes").length],
-          color: palette[i%palette.length] };
+        return { label: u, data: [
+          recs.length,
+          recs.filter(r => r.profil==="Yes").length,
+          recs.filter(r => r.a_postule==="Yes").length,
+          recs.filter(r => r.a_participe==="Yes").length,
+        ], color: PAL[i%PAL.length] };
       });
-      Charts.groupedBarChart(document.getElementById("chart-ov-funnel"),
-        ["Respondents","Want to go","Applied","Already gone"], funnelDatasets, { horizontal: true });
-    } else if (compareActive) {
-      Charts.groupedBarChart(document.getElementById("chart-ov-groups"), labelArr, [
-        { label: "Selected university", data: pctBase, color: COLOR_SEL },
-        { label: "Entire sample", data: pctAll, color: COLOR_ALL },
-      ], { max: 100 });
-      Charts.barChart(document.getElementById("chart-ov-funnel"),
-        ["Respondents", "Want to go", "Applied", "Already gone"],
-        [n, wantsToGo, applied, alreadyGone],
-        { horizontal: true, colors: [CFG.theme.rainbow[5], CFG.theme.rainbow[4], CFG.theme.rainbow[2], CFG.theme.rainbow[3]] });
+      Charts.groupedBarChart(cvs2, ["Respondents","Want to go","Applied","Already gone"], fd, { horizontal: true });
     } else {
-      Charts.barChart(document.getElementById("chart-ov-groups"), labelArr, pctBase, { colors, max: 100 });
-      Charts.barChart(document.getElementById("chart-ov-funnel"),
-        ["Respondents", "Want to go", "Applied", "Already gone"],
+      const n = base.length;
+      const wantsToGo   = base.filter(r => r.profil === "Yes").length;
+      const applied     = base.filter(r => r.a_postule === "Yes").length;
+      const alreadyGone = base.filter(r => r.a_participe === "Yes").length;
+      const pctBase = order.map(g => n ? (DE.countBy(base,"groupe")[g]||0)/n*100 : 0);
+      if (compareActive) {
+        const countsAll = DE.countBy(all, "groupe");
+        const nAll = all.length;
+        const pctAll = order.map(g => nAll ? (countsAll[g]||0)/nAll*100 : 0);
+        Charts.groupedBarChart(cvs1, labelArr, [
+          { label: "Selected university", data: pctBase, color: COLOR_SEL },
+          { label: "Entire sample", data: pctAll, color: COLOR_ALL },
+        ], { max: 100 });
+      } else {
+        Charts.barChart(cvs1, labelArr, pctBase, { colors, max: 100 });
+      }
+      Charts.barChart(cvs2,
+        ["Respondents","Want to go","Applied","Already gone"],
         [n, wantsToGo, applied, alreadyGone],
-        { horizontal: true, colors: [CFG.theme.rainbow[5], CFG.theme.rainbow[4], CFG.theme.rainbow[2], CFG.theme.rainbow[3]] });
+        { horizontal: true, colors: [CFG.theme.rainbow[5],CFG.theme.rainbow[4],CFG.theme.rainbow[2],CFG.theme.rainbow[3]] });
     }
   }
 
