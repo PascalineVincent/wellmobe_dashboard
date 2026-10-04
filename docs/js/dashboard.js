@@ -25,9 +25,10 @@ const Dashboard = (() => {
     const all = ctx.records;
     const sel = ctx.selectedUniversity;
     const unis = ctx.selectedUniversities || (sel === "ALL" ? ["ALL"] : [sel]);
+    const multiMode = !unis.includes("ALL") && unis.length > 1;
     const base = unis.includes("ALL") ? all : all.filter((r) => unis.includes(r.University));
-    const compareActive = !unis.includes("ALL") && unis.length === 1 && ctx.compare;
-    return { all, base, compareActive, sel, unis };
+    const compareActive = !multiMode && !unis.includes("ALL") && unis.length === 1 && ctx.compare;
+    return { all, base, compareActive, sel, unis, multiMode };
   }
 
   function fmtPct(x) { return x === null || x === undefined || isNaN(x) ? "–" : Math.round(x) + "%"; }
@@ -66,7 +67,7 @@ const Dashboard = (() => {
   }
   function legendBar() {
     return `<div class="legend-pair" style="margin:-8px 0 16px;">
-      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>${(typeof t!=="undefined"&&t("legendSel")!=="legendSel")?t("legendSel"):"Selected universities"}</span>
+      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>${(typeof t!=="undefined"&&t("legendSel")!=="legendSel")?t("legendSel"):"Selected university"}</span>
       <span class="item"><span class="swatch" style="background:${COLOR_ALL}"></span>${(typeof t!=="undefined"&&t("legendAll")!=="legendAll")?t("legendAll"):"Entire sample"}</span>
     </div>`;
   }
@@ -77,6 +78,29 @@ const Dashboard = (() => {
     if (!rkKey || typeof t === "undefined") return "";
     const text = t(rkKey); if (!text || text === rkKey) return "";
     return `<div class="reading-key"><span class="rk-label">${t("readingKey")||"How to read"} —</span> ${text}</div>`;
+  }
+  // Multi-university bar chart helper
+  // metricFn(records) → number|null
+  function multiUniBar(canvasId, unis, all, metricFn, opts) {
+    opts = opts || {};
+    const vals = unis.map(u => metricFn(all.filter(r => r.University === u)));
+    const colors = unis.map((_, i) => {
+      const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
+      return palette[i % palette.length];
+    });
+    Charts.barChart(document.getElementById(canvasId), unis, vals,
+      Object.assign({ horizontal: true, colors }, opts));
+  }
+  // Multi-university grouped bar: one series per university, categories = groups
+  function multiUniGrouped(canvasId, unis, all, categories, catFn, opts) {
+    opts = opts || {};
+    const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
+    const datasets = unis.map((u, i) => ({
+      label: u,
+      data: categories.map(cat => catFn(all.filter(r => r.University === u), cat)),
+      color: palette[i % palette.length],
+    }));
+    Charts.groupedBarChart(document.getElementById(canvasId), categories, datasets, opts);
   }
 
   function pctOf(records, field, value) {
@@ -163,7 +187,7 @@ const Dashboard = (() => {
     }
 
     container.innerHTML = sectionHeader("Overview",
-      "This section presents the overall composition of the sample: the share of respondents in each of the four mobility profiles (already gone, wants to go and has applied, wants to go without having applied, does not want to go), and the conversion funnel between these stages.", "rk_overview") +
+      "This section presents the overall composition of the sample: the share of respondents in each of the four mobility profiles (already gone, wants to go and has applied, wants to go without having applied, does not want to go), and the conversion funnel between these stages.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-3">
         ${kpi(n, "Respondents" + (compareActive ? " (selected university)" : ""))}
@@ -176,19 +200,46 @@ const Dashboard = (() => {
       </div>`;
 
     const labelArr = order.map((g) => labels[g]);
-    if (compareActive) {
+
+    if (multiMode) {
+      // Multi-university mode: one series per university
+      const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
+      const datasets = unis.map((u, i) => {
+        const recs = all.filter(r => r.University === u);
+        const cnt = DE.countBy(recs, "groupe");
+        const nn = recs.length;
+        return { label: u, data: order.map(g => nn ? (cnt[g]||0)/nn*100 : 0), color: palette[i%palette.length] };
+      });
+      Charts.groupedBarChart(document.getElementById("chart-ov-groups"), labelArr, datasets, { max: 100 });
+      // Funnel: grouped by university
+      const funnelDatasets = unis.map((u, i) => {
+        const recs = all.filter(r => r.University === u);
+        const nn = recs.length;
+        return { label: u,
+          data: [nn,
+            recs.filter(r => r.profil==="Yes").length,
+            recs.filter(r => r.a_postule==="Yes").length,
+            recs.filter(r => r.a_participe==="Yes").length],
+          color: palette[i%palette.length] };
+      });
+      Charts.groupedBarChart(document.getElementById("chart-ov-funnel"),
+        ["Respondents","Want to go","Applied","Already gone"], funnelDatasets, { horizontal: true });
+    } else if (compareActive) {
       Charts.groupedBarChart(document.getElementById("chart-ov-groups"), labelArr, [
         { label: "Selected university", data: pctBase, color: COLOR_SEL },
         { label: "Entire sample", data: pctAll, color: COLOR_ALL },
       ], { max: 100 });
+      Charts.barChart(document.getElementById("chart-ov-funnel"),
+        ["Respondents", "Want to go", "Applied", "Already gone"],
+        [n, wantsToGo, applied, alreadyGone],
+        { horizontal: true, colors: [CFG.theme.rainbow[5], CFG.theme.rainbow[4], CFG.theme.rainbow[2], CFG.theme.rainbow[3]] });
     } else {
       Charts.barChart(document.getElementById("chart-ov-groups"), labelArr, pctBase, { colors, max: 100 });
+      Charts.barChart(document.getElementById("chart-ov-funnel"),
+        ["Respondents", "Want to go", "Applied", "Already gone"],
+        [n, wantsToGo, applied, alreadyGone],
+        { horizontal: true, colors: [CFG.theme.rainbow[5], CFG.theme.rainbow[4], CFG.theme.rainbow[2], CFG.theme.rainbow[3]] });
     }
-
-    Charts.barChart(document.getElementById("chart-ov-funnel"),
-      ["Respondents", "Want to go", "Applied", "Already gone"],
-      [n, wantsToGo, applied, alreadyGone],
-      { horizontal: true, colors: [CFG.theme.rainbow[5], CFG.theme.rainbow[4], CFG.theme.rainbow[2], CFG.theme.rainbow[3]] });
   }
 
   // ===========================================================
@@ -200,7 +251,7 @@ const Dashboard = (() => {
     const container = document.getElementById("section-socio");
 
     container.innerHTML = sectionHeader("Socio-demographic profile",
-      "Distribution of respondents by gender, level of study and geographic area of origin, and the composition of each mobility group along these characteristics.", "rk_socio") +
+      "Distribution of respondents by gender, level of study and geographic area of origin, and the composition of each mobility group along these characteristics.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid">
         ${card("chart-socio-genre", "Gender", "Distribution of respondents by self-reported gender.")}
@@ -253,12 +304,28 @@ const Dashboard = (() => {
       pctCertAll = certCats.map((_, i) => (nCertAll ? ((certCountsAll[i] || 0) / nCertAll) * 100 : 0));
     }
 
+    if (multiMode) {
+      const pal = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
+      container.innerHTML = sectionHeader("Academic & language profile",
+        "Comparing academic grades and English certification across universities.", "rk_academic") +
+        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-acad-grade-mu", "Academic grade (0-10) by university", "Mean ± SE.", "", "h-280")}
+          ${card("chart-acad-cert-mu", "English certified (≥B2) by university", "% certified.", "", "h-280")}
+        </div>`;
+      multiUniBar("chart-acad-grade-mu", unis, all,
+        recs => DE.mean(recs.map(r=>r.moyenne_acad_norm).filter(v=>v!=null)), { max:10 });
+      multiUniBar("chart-acad-cert-mu", unis, all,
+        recs => { const v=recs.filter(r=>r.english_certified!=null); return v.length ? v.filter(r=>r.english_certified===1).length/v.length*100 : null; }, { max:100 });
+      return;
+    }
+
     const gradeCmp = meanCompare(base, all, "moyenne_acad_norm", compareActive);
     const certPctBase = pctOf(base, "english_certified", 1);
     const certPctAll = compareActive ? pctOf(all, "english_certified", 1) : null;
 
     container.innerHTML = sectionHeader("Academic & language profile",
-      "The academic grade is normalized on a 0-10 scale, accounting for each university's own grading scale. The certified English level corresponds to the highest self-reported certification (Q24); 'certified' means a level of B2 or above.", "rk_academic") +
+      "The academic grade is normalized on a 0-10 scale, accounting for each university's own grading scale. The certified English level corresponds to the highest self-reported certification (Q24); 'certified' means a level of B2 or above.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-3">
         ${kpi(fmtNum(gradeCmp.b.mean, 1) + (compareActive ? ` <span class="text-muted" style="font-size:1rem">/ ${fmtNum(gradeCmp.a.mean, 1)}</span>` : ""), "Academic grade (/10)" + (compareActive ? " — selected / overall" : ""))}
@@ -308,12 +375,35 @@ const Dashboard = (() => {
       pctIncAll = incomeLabels.map((_, i) => (nIncAll ? ((incomeCountsAll[i + 1] || 0) / nIncAll) * 100 : 0));
     }
 
+    if (multiMode) {
+      container.innerHTML = sectionHeader("Financial profile",
+        "Comparing financial indicators across universities.", "rk_financial") +
+        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-fin-comfort-mu", "Financial comfort (1-5) by university", "1=very comfortable, 5=not at all.", "", "h-280")}
+          ${card("chart-fin-dep-mu", "Can absorb €1k expense by university", "% yes.", "", "h-280")}
+        </div>
+        <div class="grid">
+          ${card("chart-fin-sch-mu", "Scholarship holders by university", "% scholarship.", "", "h-280")}
+          ${card("chart-fin-vuln-mu", "Mean vulnerability index (Vi) by university", "0-10.", "", "h-280")}
+        </div>`;
+      multiUniBar("chart-fin-comfort-mu", unis, all,
+        recs => DE.mean(recs.map(r=>r.aisance_fin).filter(v=>v!=null)), { max:5 });
+      multiUniBar("chart-fin-dep-mu", unis, all,
+        recs => { const v=recs.filter(r=>r.depense_imp!=null); return v.length?v.filter(r=>r.depense_imp===1).length/v.length*100:null; }, { max:100 });
+      multiUniBar("chart-fin-sch-mu", unis, all,
+        recs => { const v=recs.filter(r=>r.scholarship!=null); return v.length?v.filter(r=>r.scholarship===1).length/v.length*100:null; }, { max:100 });
+      multiUniBar("chart-fin-vuln-mu", unis, all,
+        recs => DE.mean(recs.map(r=>r.score_vuln).filter(v=>v!=null&&!isNaN(v))), { max:10 });
+      return;
+    }
+
     const comfortCmp = meanCompare(base, all, "aisance_fin", compareActive);
     const depCmp = { b: pctOf(base, "depense_imp", 1), a: compareActive ? pctOf(all, "depense_imp", 1) : null };
     const schCmp = { b: pctOf(base, "scholarship", 1), a: compareActive ? pctOf(all, "scholarship", 1) : null };
 
     container.innerHTML = sectionHeader("Financial profile",
-      "Financial comfort is reported on its original 1-5 scale: <strong>1 = very comfortable, 5 = not comfortable at all</strong> (so a lower average indicates a more comfortable group). The ability to absorb an unexpected €1,000 expense and scholarship status (Q25) are used as additional indicators of financial constraint.", "rk_financial") +
+      "Financial comfort is reported on its original 1-5 scale: <strong>1 = very comfortable, 5 = not comfortable at all</strong> (so a lower average indicates a more comfortable group). The ability to absorb an unexpected €1,000 expense and scholarship status (Q25) are used as additional indicators of financial constraint.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-3">
         ${kpi(fmtNum(comfortCmp.b.mean, 1) + (compareActive ? ` <span class="text-muted" style="font-size:1rem">/ ${fmtNum(comfortCmp.a.mean, 1)}</span>` : ""), "Financial comfort (1-5, 1=very comfortable)" + (compareActive ? " — selected / overall" : ""))}
@@ -402,6 +492,24 @@ const Dashboard = (() => {
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-international");
 
+    if (multiMode) {
+      container.innerHTML = sectionHeader("International & psychological profile",
+        "Comparing international profile scores and psychological dimensions across universities.", "rk_international") +
+        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-intl-score-mu", "International profile score (0-10) by university", "Higher = more internationally open.", "", "h-280")}
+          ${card("chart-intl-radar-mu", "Psychological profile by university", "Mean per dimension (1-5).", "", "h-340")}
+        </div>`;
+      multiUniBar("chart-intl-score-mu", unis, all,
+        recs => DE.mean(recs.map(r=>r.score_intl).filter(v=>v!=null)), { max:10 });
+      const themes = CFG.dimsPsyOrder;
+      const palette = ["#2D5F8A","#D26482","#27AE9E","#C8A86B","#7D41AF","#329B5A","#D27832"];
+      Charts.radarChart(document.getElementById("chart-intl-radar-mu"), themes,
+        unis.map((u,i) => ({ label: u, data: themes.map(t => themeMean(all.filter(r=>r.University===u), t)), color: palette[i%palette.length] })),
+        { min:1, max:5 });
+      return;
+    }
+
     const intlByGroup = DE.meanByGroup(base, "score_intl", "groupe", order);
     const intlMeans = order.map((g) => intlByGroup[g].mean);
     const intlSE = order.map((g) => intlByGroup[g].se || 0);
@@ -416,7 +524,7 @@ const Dashboard = (() => {
     }));
 
     container.innerHTML = sectionHeader("International & psychological profile",
-      "The international profile score (0-10) summarizes 8 psychological items related to international openness (working abroad, curiosity, adaptability, European identity...). The radar chart shows, for each of the 7 broad psychological dimensions, the average score (1-5 scale) by mobility group.", "rk_international") +
+      "The international profile score (0-10) summarizes 8 psychological items related to international openness (working abroad, curiosity, adaptability, European identity...). The radar chart shows, for each of the 7 broad psychological dimensions, the average score (1-5 scale) by mobility group.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid">
         ${card("chart-intl-score", "International profile score (0-10) by group", `Mean ± standard error. Overall difference between groups: ${sigBadge(kwIntl.p)} (Kruskal-Wallis).`)}
@@ -450,6 +558,25 @@ const Dashboard = (() => {
     const freinFields = CFG.fields.filter((f) => f.key.startsWith("frein_"));
     const allKeys = freinFields.map((f) => f.key);
     const validKeys = DE.validLikertCols(base, allKeys);
+
+    if (multiMode) {
+      // Top 8 barriers for each university side by side
+      const validKeysAll = DE.validLikertCols(all, allKeys);
+      const items = freinFields.filter(f => validKeysAll.includes(f.key)).map(f => ({
+        key: f.key, label: f.label,
+        mean: DE.mean(base.map(r=>r[f.key]).filter(v=>v!=null))
+      })).filter(i=>i.mean!=null).sort((a,b)=>b.mean-a.mean).slice(0,10);
+      const h = Math.max(280, items.length*40) + "px";
+      container.innerHTML = sectionHeader("Barriers to mobility",
+        "Top barriers across selected universities (1=not a barrier, 5=major barrier).", "rk_barriers") +
+        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid cols-1">${card("chart-bar-multi", "Barriers by university (mean score, 1-5)", "Top 10 barriers, one series per university.", "", "h-"+Math.max(320,items.length*44))}</div>`;
+      multiUniGrouped("chart-bar-multi", unis, all,
+        items.map(i=>i.label),
+        (recs, cat) => { const f=items.find(i=>i.label===cat); if(!f)return null; const v=recs.map(r=>r[f.key]).filter(x=>x!=null); return v.length?DE.mean(v):null; },
+        { horizontal:true, max:5 });
+      return;
+    }
 
     if (validKeys.length === 0) {
       container.innerHTML = sectionHeader("Barriers to mobility",
@@ -527,7 +654,7 @@ const Dashboard = (() => {
 
     if (grp1.length === 0 || validKeys.length === 0) {
       container.innerHTML = sectionHeader("Reasons for going (\u201CAlready gone\u201D group)",
-        "This section presents, for respondents who have already completed a mobility stay, the reasons that motivated their departure.", "rk_reasons") +
+        "This section presents, for respondents who have already completed a mobility stay, the reasons that motivated their departure.") +
         emptyState("Not enough respondents in the \u201CAlready gone\u201D group for this selection.");
       return;
     }
@@ -579,7 +706,7 @@ const Dashboard = (() => {
     });
 
     container.innerHTML = sectionHeader("Group 2 vs Group 3: who follows through?",
-      `Comparison between respondents who want to go and have already applied ("Wants to go & applied", n=${grp2.length}) and those who want to go but have not yet applied ("Wants to go (not applied)", n=${grp3.length}). The chart shows normalized values (0-100, on each variable's own scale) to visually compare gaps; the table below gives the actual values.`) +
+      `Comparison between respondents who want to go and have already applied ("Wants to go & applied", n=${grp2.length}) and those who want to go but have not yet applied ("Wants to go (not applied)", n=${grp3.length}). The chart shows normalized values (0-100, on each variable's own scale) to visually compare gaps; the table below gives the actual values.`, "rk_grp23") +
       `<div class="grid cols-1">
         ${card("chart-grp23-dumbbell", "Normalized comparison (0-100)", "For each variable, relative position on its own scale. * p<0.05, ** p<0.01, *** p<0.001 (Mann-Whitney test).", "", "h-340")}
       </div>
@@ -609,79 +736,73 @@ const Dashboard = (() => {
   // J. Comparison between universities
   // ===========================================================
   function renderUniversities(ctx) {
-    const { all, unis: selUnis } = getCtxData(ctx);
+    const { all, unis, multiMode } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-universities");
 
-    // Use selected universities if specific ones chosen, otherwise all
-    const allUnis = [...new Set(all.map((r) => r.University))].sort();
-    const isFiltered = !selUnis.includes("ALL") && selUnis.length > 1;
-    const unis = isFiltered ? selUnis.filter(u => allUnis.includes(u)) : allUnis;
-    // Records to use for comparison
-    const pool = isFiltered
-      ? all.filter(r => unis.includes(r.University))
-      : all;
+    // Use selected unis if multiMode, otherwise all available
+    const allUnis = [...new Set(all.map(r => r.University))].sort();
+    const displayUnis = multiMode ? unis.filter(u => allUnis.includes(u)) : allUnis;
+    const pool = multiMode ? all.filter(r => displayUnis.includes(r.University)) : all;
 
-    if (unis.length < 2) {
+    if (displayUnis.length < 2) {
       container.innerHTML = sectionHeader("Comparison between universities",
         "This section compares the composition of mobility groups across universities.", "rk_universities") +
         emptyState(typeof t !== "undefined" && t("loadTwoUniv") !== "loadTwoUniv"
           ? t("loadTwoUniv")
-          : "Load data from at least two universities to enable this comparison.");
+          : "Select at least two universities in the filter above to compare them.");
       return;
     }
 
-    const uniH = Math.max(260, unis.length * 36) + "px";
+    const uniH = Math.max(280, displayUnis.length * 40);
     const compData = crossPct(pool, "University", "groupe", order);
     const nByUni = DE.countBy(pool, "University");
-
-    // Key indicators per university
-    const uniStats = unis.map(u => {
+    const uniStats = displayUnis.map(u => {
       const recs = pool.filter(r => r.University === u);
-      const g4pct = recs.length ? (recs.filter(r => r.groupe === "Does not want to go").length / recs.length * 100) : null;
-      const vulnMean = DE.mean(recs.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v)));
-      const intlMean = DE.mean(recs.map(r => r.score_intl).filter(v => v !== null && !isNaN(v)));
-      return { u, n: recs.length, g4pct, vulnMean, intlMean };
+      return {
+        u, n: recs.length,
+        g4pct: recs.length ? recs.filter(r => r.groupe==="Does not want to go").length/recs.length*100 : null,
+        vulnMean: DE.mean(recs.map(r=>r.score_vuln).filter(v=>v!=null&&!isNaN(v))),
+        intlMean: DE.mean(recs.map(r=>r.score_intl).filter(v=>v!=null)),
+      };
     });
 
     container.innerHTML = sectionHeader("Comparison between universities",
-      `Comparing ${unis.length} universities: group composition, vulnerability index, and international profile.`, "rk_universities") +
-      (isFiltered ? `<div class="info-box" style="margin-bottom:14px;">Showing <strong>${unis.length} selected universities</strong>. Deselect to show all loaded universities.</div>` : "") +
+      `Comparing ${displayUnis.length} universities: group composition, vulnerability index, and international profile.`, "rk_universities") +
+      (multiMode ? `<div class="info-box" style="margin-bottom:12px;">Showing <strong>${displayUnis.length} selected universities</strong>. Use the filter above to change the selection.</div>` : "") +
       `<div class="grid cols-1">
-        ${card("chart-univ-comp", "Group composition by university (%)", "Each row totals 100%. Compare the share of each mobility profile across sites.", "", "h-" + Math.max(260, unis.length * 40))}
+        ${card("chart-univ-comp", "Group composition by university (%)", "Each row totals 100%.", "", "h-${uniH}")}
       </div>
       <div class="grid">
         ${card("chart-univ-n", "Respondents per university", "", "", "h-280")}
-        ${card("chart-univ-g4", "% Does not want to go (G4)", "Higher = more non-mobile students.", "", "h-280")}
+        ${card("chart-univ-g4", "% Does not want to go (G4)", "", "", "h-280")}
       </div>
       <div class="grid">
-        ${card("chart-univ-vuln", "Mean structural vulnerability (Vi, 0-10)", "Higher = more structurally constrained.", "", "h-280")}
-        ${card("chart-univ-intl", "Mean international profile score (0-10)", "Higher = more internationally open.", "", "h-280")}
+        ${card("chart-univ-vuln", "Mean structural vulnerability Vi (0-10)", "", "", "h-280")}
+        ${card("chart-univ-intl", "Mean international profile score (0-10)", "", "", "h-280")}
       </div>
       <div class="grid cols-1"><div class="card">
         <h3>Summary table</h3>
         <table class="stat-table">
           <thead><tr><th>University</th><th class="num">n</th><th class="num">G4 %</th><th class="num">Vi mean</th><th class="num">Intl. score</th></tr></thead>
           <tbody>${uniStats.map(s => `<tr>
-            <td>${DE.escapeHtml(s.u)}</td>
-            <td class="num">${s.n}</td>
-            <td class="num">${s.g4pct !== null ? Math.round(s.g4pct) + "%" : "–"}</td>
-            <td class="num">${s.vulnMean !== null ? s.vulnMean.toFixed(2) : "–"}</td>
-            <td class="num">${s.intlMean !== null ? s.intlMean.toFixed(2) : "–"}</td>
+            <td>${DE.escapeHtml(s.u)}</td><td class="num">${s.n}</td>
+            <td class="num">${s.g4pct!==null?Math.round(s.g4pct)+"%":"–"}</td>
+            <td class="num">${s.vulnMean!==null?s.vulnMean.toFixed(2):"–"}</td>
+            <td class="num">${s.intlMean!==null?s.intlMean.toFixed(2):"–"}</td>
           </tr>`).join("")}</tbody>
         </table>
       </div></div>`;
 
-    Charts.stackedPercentChart(document.getElementById("chart-univ-comp"), unis,
-      order.map((g) => ({ key: g, label: labels[g], color: CFG.groups.colors[g] })), compData);
-    Charts.barChart(document.getElementById("chart-univ-n"), unis, unis.map(u => nByUni[u] || 0), { horizontal: true, colors: COLOR_BASE });
-    Charts.barChart(document.getElementById("chart-univ-g4"), unis, uniStats.map(s => s.g4pct), { horizontal: true, colors: CFG.groups.colors["Does not want to go"], max: 100 });
-    if (uniStats.some(s => s.vulnMean !== null))
-      Charts.barChart(document.getElementById("chart-univ-vuln"), unis, uniStats.map(s => s.vulnMean), { horizontal: true, colors: COLOR_BASE, max: 10 });
-    if (uniStats.some(s => s.intlMean !== null))
-      Charts.barChart(document.getElementById("chart-univ-intl"), unis, uniStats.map(s => s.intlMean), { horizontal: true, colors: CFG.theme.accent || COLOR_BASE, max: 10 });
+    Charts.stackedPercentChart(document.getElementById("chart-univ-comp"), displayUnis,
+      order.map(g => ({ key: g, label: labels[g], color: CFG.groups.colors[g] })), compData);
+    Charts.barChart(document.getElementById("chart-univ-n"), displayUnis, displayUnis.map(u=>nByUni[u]||0), { horizontal:true, colors:COLOR_BASE });
+    Charts.barChart(document.getElementById("chart-univ-g4"), displayUnis, uniStats.map(s=>s.g4pct), { horizontal:true, colors:CFG.groups.colors["Does not want to go"], max:100 });
+    if (uniStats.some(s=>s.vulnMean!==null))
+      Charts.barChart(document.getElementById("chart-univ-vuln"), displayUnis, uniStats.map(s=>s.vulnMean), { horizontal:true, colors:COLOR_BASE, max:10 });
+    if (uniStats.some(s=>s.intlMean!==null))
+      Charts.barChart(document.getElementById("chart-univ-intl"), displayUnis, uniStats.map(s=>s.intlMean), { horizontal:true, colors:"#4182C8", max:10 });
   }
-
   // ===========================================================
   // K. Statistical tests
   // ===========================================================
@@ -750,7 +871,7 @@ const Dashboard = (() => {
     }
 
     container.innerHTML = sectionHeader("Statistical tests",
-      "This section summarizes the significance tests used elsewhere in the dashboard: the Chi-square test for categorical variables, the Kruskal-Wallis test (difference across the four groups), and the Mann-Whitney test (comparison of two groups). A result is considered statistically significant when p < 0.05.", "rk_stats") +
+      "This section summarizes the significance tests used elsewhere in the dashboard: the Chi-square test for categorical variables, the Kruskal-Wallis test (difference across the four groups), and the Mann-Whitney test (comparison of two groups). A result is considered statistically significant when p < 0.05.") +
       `<div class="grid cols-1"><div class="card">
         <h3>Differences across the four mobility groups${sel !== "ALL" ? ` — ${DE.escapeHtml(sel)}` : ""}</h3>
         <p class="card-note">Tests whether the variable differs significantly across the four mobility groups, within the current selection.</p>
@@ -1230,8 +1351,23 @@ const Dashboard = (() => {
     const container = document.getElementById("section-vulnerability");
 
     if (base.length === 0) {
-      container.innerHTML = sectionHeader("Structural Vulnerability Index", "", "rk_vulnerability") +
+      container.innerHTML = sectionHeader("Structural Vulnerability Index", "") +
         emptyState("No data for this selection.");
+      return;
+    }
+
+    if (multiMode) {
+      container.innerHTML = sectionHeader("Structural Vulnerability Index",
+        "Comparing structural vulnerability across universities.", "rk_vulnerability") +
+        `<div class="info-box" style="margin-bottom:12px;">Comparing <strong>${unis.length} universities</strong>: ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-vuln-mean-mu", "Mean Vi by university (0-10)", "Higher = more constrained.", "", "h-280")}
+          ${card("chart-vuln-high-mu", "% Vi > 6 (resigned non-movers) by university", "Share above critical threshold.", "", "h-280")}
+        </div>`;
+      multiUniBar("chart-vuln-mean-mu", unis, all,
+        recs => DE.mean(recs.map(r=>r.score_vuln).filter(v=>v!=null&&!isNaN(v))), { max:10 });
+      multiUniBar("chart-vuln-high-mu", unis, all,
+        recs => { const v=recs.filter(r=>r.score_vuln!=null&&!isNaN(r.score_vuln)); return v.length?v.filter(r=>r.score_vuln>6).length/v.length*100:null; }, { max:100 });
       return;
     }
 
@@ -1406,7 +1542,7 @@ const Dashboard = (() => {
       relevantRaw.every(d => d.dataRows.length === 0);
 
     container.innerHTML = sectionHeader("Variable Explorer",
-      "Explore any variable from your Excel file: select a column to see its distribution and breakdown by mobility group. \"Raw variables\" are the original questionnaire columns as they appear in your Excel file; \"Derived variables\" are computed by the tool (normalized grades, vulnerability score, groups, etc.).") +
+      "Explore any variable from your Excel file: select a column to see its distribution and breakdown by mobility group. \"Raw variables\" are the original questionnaire columns as they appear in your Excel file; \"Derived variables\" are computed by the tool (normalized grades, vulnerability score, groups, etc.).", "rk_reasons") +
       (headersOnlyMode ? `<div class="info-box warn" style="margin-bottom:14px;">
         <strong>Raw variable values are not available after a page reload</strong> (the file was too large to keep in the browser cache). Column <em>names</em> are shown in the selector but charts will not display. To restore full access to raw variables, go to <strong>Data → Reset</strong> and re-import your file.
       </div>` : "") +
