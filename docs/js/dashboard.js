@@ -705,7 +705,7 @@ const Dashboard = (() => {
   // H. Reasons for going (Group 1 only)
   // ===========================================================
   function renderReasons(ctx) {
-    const { base, multiMode, unis } = getCtxData(ctx);
+    const { all, base, multiMode, unis } = getCtxData(ctx);
     const container = document.getElementById("section-reasons");
 
     const grp1 = base.filter((r) => r.groupe === "Already gone");
@@ -1451,11 +1451,13 @@ const Dashboard = (() => {
     const groupSE    = order.map(g => byGroup[g].length ? DE.se(byGroup[g])   : null);
 
     const subcomps = [
-      { key: "aisance_fin",       label: "Financial comfort (F)" },
-      { key: "revenu_num",        label: "Household income (F)" },
-      { key: "depense_imp",       label: "Can absorb \u20ac1k expense (F)" },
-      { key: "moyenne_acad_norm", label: "Academic grade (A)" },
-      { key: "educ_num",          label: "Parental education (E)" },
+      { key: "aisance_fin",       label: "Financial comfort — F (1=comfortable, 5=not)" },
+      { key: "revenu_num",        label: "Household income — F (1-8)" },
+      { key: "depense_imp",       label: "Can absorb €1k expense — F (1=yes)" },
+      { key: "moyenne_acad_norm", label: "Academic grade inverted — A (0-10)" },
+      { key: "educ_num",          label: "Parental education — E (1-6, higher=more educated)" },
+      { key: "pays_num",          label: "Countries visited inverted — C (1=4+, 5=none)" },
+      { key: "lang_num",          label: "Languages spoken inverted — C (1=4+, 5=none)" },
     ];
 
     const resignedRow = order.map(g => {
@@ -1468,10 +1470,11 @@ const Dashboard = (() => {
     const mwu = DE.mannWhitneyU(byGroup["Wants to go & applied"], byGroup["Wants to go"]);
 
     container.innerHTML = sectionHeader("Structural Vulnerability Index",
-      `V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>) / 5 × 10 — 
-      <strong>F<sub>i</sub></strong>: financial constraint composite (financial comfort + household income + ability to absorb unexpected expense); 
-      <strong>A<sub>i</sub></strong>: academic constraint; 
-      <strong>E<sub>i</sub></strong>: parental education constraint. 
+      `V<sub>i</sub><sup>PCA</sup> = (0.459·F<sub>i</sub> + 0.142·A<sub>i</sub> + 0.240·E<sub>i</sub> + 0.159·C<sub>i</sub>) / 5 × 10 — 
+      <strong>F<sub>i</sub></strong>: financial constraint (comfort + income + expense shock); 
+      <strong>A<sub>i</sub></strong>: academic grade (inverted); 
+      <strong>E<sub>i</sub></strong>: parental education (inverted); 
+      <strong>C<sub>i</sub></strong>: cultural exposure — countries + languages (inverted). 
       Missing → 2.5. Scale: 0 = no constraint, 10 = maximum. Threshold V<sub>i</sub> > 6 = "resigned non-mover".`) +
       `<div class="grid">
         ${card("chart-vuln-means", "V\u1d62 by group — mean \u00b1 SE",

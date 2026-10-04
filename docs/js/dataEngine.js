@@ -232,6 +232,17 @@ const DataEngine = (() => {
     // ordinal
     rec.revenu_num = mapOrdinal(raw.revenu_foyer, config.incomeCategories, true);
     rec.educ_num = mapOrdinal(raw.educ_parents, config.educationCategories, false);
+    // pays_num: number of European countries visited (1=4+, 5=0) — inverted scale, high=constrained
+    // Tries ordinal mapping first, then direct numeric
+    rec.pays_num = mapOrdinal(raw.pays_num, config.paysCategories || ["4","3","2","1","0"], false)
+      || (raw.pays_num !== null && raw.pays_num !== undefined && raw.pays_num !== ""
+          ? Math.min(5, Math.max(1, 6 - Math.round(Number(String(raw.pays_num).replace(/[^0-9.]/g,"")) || 0)))
+          : null);
+    // lang_num: number of foreign languages spoken (1=4+, 5=0) — inverted scale
+    rec.lang_num = mapOrdinal(raw.lang_num, config.langCategories || ["4","3","2","1","0"], false)
+      || (raw.lang_num !== null && raw.lang_num !== undefined && raw.lang_num !== ""
+          ? Math.min(5, Math.max(1, 6 - Math.round(Number(String(raw.lang_num).replace(/[^0-9.]/g,"")) || 0)))
+          : null);
     rec.english_cert = matchEnglishLevel(raw.english_cert, config);
     rec.english_certified = rec.english_cert === null ? null :
       (rec.english_cert >= config.englishLevels.indexOf(config.englishCertifiedFrom) ? 1 : 0);
@@ -291,7 +302,7 @@ const DataEngine = (() => {
       ? (rec.depense_imp === 1 ? 1 : 5) : MISS;
     const Fi = (fi_aisance + fi_revenu + fi_depense) / 3;
 
-    // A_i: academic constraint (0=max grade→0 constraint, missing→2.5)
+    // A_i: academic constraint (inverted grade, missing→2.5)
     const Ai = (rec.moyenne_acad_norm !== null && rec.moyenne_acad_norm !== undefined)
       ? ((10 - rec.moyenne_acad_norm) / 10) * 5 : MISS;
 
@@ -299,7 +310,20 @@ const DataEngine = (() => {
     const Ei = (rec.educ_num !== null && rec.educ_num !== undefined)
       ? ((7 - rec.educ_num) / 6) * 5 : MISS;
 
-    rec.score_vuln = Math.round(((0.4 * Fi + 0.3 * Ai + 0.3 * Ei) / 5 * 10) * 100) / 100;
+    // C_i: cultural exposure constraint (countries + languages visited, both inverted 1-5)
+    // pays_num: 1=4+ countries, 5=0 countries (already inverted → high = constrained)
+    // lang_num: 1=4+ languages, 5=0 languages (already inverted → high = constrained)
+    const ci_pays = (rec.pays_num !== null && rec.pays_num !== undefined) ? rec.pays_num : MISS;
+    const ci_lang = (rec.lang_num !== null && rec.lang_num !== undefined) ? rec.lang_num : MISS;
+    const Ci = (ci_pays + ci_lang) / 2;
+
+    // Vi-PCA formula (weights from PCA PC1 loadings, normalized to sum=1)
+    // Vi = (0.459·Fi + 0.142·Ai + 0.240·Ei + 0.159·Ci) / 5 × 10
+    rec.score_vuln = Math.round(((0.459 * Fi + 0.142 * Ai + 0.240 * Ei + 0.159 * Ci) / 5 * 10) * 100) / 100;
+    rec.score_Fi = Math.round(Fi * 100) / 100;
+    rec.score_Ai = Math.round(Ai * 100) / 100;
+    rec.score_Ei = Math.round(Ei * 100) / 100;
+    rec.score_Ci = Math.round(Ci * 100) / 100;
     rec.vuln_high = rec.score_vuln > 6 ? 1 : 0; // "resigned non-mover" threshold
 
     return rec;

@@ -185,6 +185,16 @@
       "type": "category"
     },
     {
+      "key": "pays_num",
+      "label": "Countries visited (Europe)",
+      "col": 0
+    },
+    {
+      "key": "lang_num",
+      "label": "Foreign languages spoken",
+      "col": 0
+    },
+    {
       "key": "parental_erasmus",
       "col": 18,
       "label": "Parental Erasmus (Q13)",
@@ -647,5 +657,19 @@
       "key": "psy_efficacy",
       "label": "Personal efficacy (psy, 1-5)"
     }
+  ],
+  "paysCategories": [
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
+  ],
+  "langCategories": [
+    "4",
+    "3",
+    "2",
+    "1",
+    "0"
   ]
 }
