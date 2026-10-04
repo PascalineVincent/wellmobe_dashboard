@@ -1,0 +1,571 @@
+/* ============================================================
+   App v12 — multi-select universities + i18n
+   ============================================================ */
+(() => {
+  const DE = DataEngine;
+
+  const STORAGE_RECORDS   = "mobins_records";
+  const STORAGE_DATASETS  = "mobins_datasets";
+  const STORAGE_RAW       = "mobins_raw";
+  const STORAGE_TEMPLATES = "mobins_templates";
+  const STORAGE_VERSION   = "mobins_schema_version";
+  const SCHEMA_VERSION    = "2";
+
+  const state = {
+    config: null,
+    records: [],
+    datasets: [],
+    rawDatasets: [],
+    uploadQueue: [],
+    activeTab: "overview",
+    selectedUniversities: ["ALL"],  // array: ["ALL"] or ["UniA","UniB",...]
+    compare: false,
+  };
+
+  // ── helpers ────────────────────────────────────────────────
+  const CATEGORY_MAP = [
+    { test: (k) => k === "University",                                             label: "Identification" },
+    { test: (k) => ["genre","niveau","zone_geo","educ_parents","revenu_foyer"].includes(k), label: "Socio-demographics" },
+    { test: (k) => ["moyenne_acad","english_cert","scholarship"].includes(k),      label: "Academic & language" },
+    { test: (k) => ["aisance_fin","depense_imp"].includes(k),                      label: "Financial profile" },
+    { test: (k) => ["parental_erasmus","a_participe","erasmus","a_postule","raison_non_partir"].includes(k), label: "Mobility" },
+    { test: (k) => k.startsWith("frein_"),   label: "Barriers to mobility (1-5)" },
+    { test: (k) => k.startsWith("raison_"),  label: "Reasons for going — Group 1 (1-5)" },
+    { test: (k) => k.startsWith("psy_"),     label: "Psychological profile (1-5)" },
+  ];
+  function fieldCategory(key) {
+    const m = CATEGORY_MAP.find(c => c.test(key));
+    return m ? m.label : "Other";
+  }
+  function orderedFields(config) {
+    const cats = [...new Set(CATEGORY_MAP.map(c => c.label)), "Other"];
+    const out = [];
+    cats.forEach(cat => config.fields.forEach(f => { if (fieldCategory(f.key) === cat) out.push(f); }));
+    return out;
+  }
+
+  // ── i18n ───────────────────────────────────────────────────
+  function applyI18n() {
+    document.documentElement.lang = getLang();
+    document.querySelectorAll(".js-app-title").forEach(el => el.textContent = t("appTitle"));
+    document.querySelectorAll(".js-app-subtitle").forEach(el => el.textContent = t("appSubtitle"));
+    document.querySelectorAll(".js-cal-subtitle").forEach(el => el.textContent = t("calTitle"));
+    document.querySelectorAll(".js-overview-btn").forEach(el => el.textContent = t("overview"));
+    document.querySelectorAll(".js-upload-how").forEach(el => el.innerHTML = t("uploadHow"));
+    document.querySelectorAll(".js-upload-btn").forEach(el => el.textContent = t("uploadBtn"));
+    document.querySelectorAll(".js-upload-drop").forEach(el => el.textContent = t("uploadDrop"));
+    document.querySelectorAll(".js-filter-label").forEach(el => el.textContent = t("filterUniversity"));
+    document.querySelectorAll(".js-compare-label").forEach(el => el.textContent = t("compareToggle"));
+    document.querySelectorAll(".js-all-label").forEach(el => el.textContent = t("allUniversities"));
+
+    const back = document.getElementById("btn-back-to-dashboard");
+    if (back) back.textContent = t("backDashboard");
+    const addData = document.getElementById("btn-add-data");
+    if (addData) addData.textContent = t("addData");
+    const exp = document.getElementById("btn-export");
+    if (exp) exp.textContent = t("exportBtn");
+    const rst = document.getElementById("btn-reset");
+    if (rst) rst.textContent = t("resetBtn");
+
+    // active lang button highlight
+    document.querySelectorAll(".lang-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-lang") === getLang());
+    });
+
+    // rebuild tabs labels if dashboard ready
+    const tabsInner = document.getElementById("tabs-inner");
+    if (tabsInner && tabsInner.children.length) buildTabLabels();
+
+    // update multi-select display
+    updateMultiDisplay();
+    updateNChip();
+  }
+
+  function setupLangSwitchers() {
+    document.querySelectorAll(".lang-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        setLang(btn.getAttribute("data-lang"));
+        applyI18n();
+        if (state.records.length > 0) renderActiveTab();
+      });
+    });
+  }
+
+  // ── bootstrap ──────────────────────────────────────────────
+  async function init() {
+    const res = await fetch("config/config.json?v=12");
+    state.config = await res.json();
+    Dashboard.init(state.config);
+
+    setupLangSwitchers();
+    applyI18n();
+    setupUploadScreen();
+    setupDashboardScreen();
+
+    if (tryRestore()) { showScreen("dashboard"); buildDashboard(); return; }
+
+    try {
+      const r = await fetch("data/dataset.json");
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data.records) && data.records.length > 0) {
+          state.records = data.records;
+          state.datasets = data.datasets || [];
+          persist();
+          showScreen("dashboard");
+          buildDashboard();
+          return;
+        }
+      }
+    } catch (e) {}
+
+    showScreen("upload");
+  }
+
+  function tryRestore() {
+    try {
+      const storedVersion = localStorage.getItem(STORAGE_VERSION);
+      if (storedVersion !== SCHEMA_VERSION) {
+        [STORAGE_RECORDS, STORAGE_DATASETS, STORAGE_RAW].forEach(k => localStorage.removeItem(k));
+        localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
+        return false;
+      }
+      const r = localStorage.getItem(STORAGE_RECORDS);
+      if (!r) return false;
+      const records = JSON.parse(r);
+      if (!Array.isArray(records) || records.length === 0) return false;
+      state.records = records;
+      state.datasets = JSON.parse(localStorage.getItem(STORAGE_DATASETS) || "[]");
+      try { state.rawDatasets = JSON.parse(localStorage.getItem(STORAGE_RAW) || "[]"); } catch (e) { state.rawDatasets = []; }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function persist() {
+    try {
+      localStorage.setItem(STORAGE_RECORDS, JSON.stringify(state.records));
+      localStorage.setItem(STORAGE_DATASETS, JSON.stringify(state.datasets));
+      localStorage.setItem(STORAGE_VERSION, SCHEMA_VERSION);
+    } catch (e) {}
+    try {
+      const rawJson = JSON.stringify(state.rawDatasets);
+      if (rawJson.length < 3 * 1024 * 1024) {
+        localStorage.setItem(STORAGE_RAW, rawJson);
+      } else {
+        localStorage.setItem(STORAGE_RAW, JSON.stringify(
+          state.rawDatasets.map(d => ({ fileName: d.fileName, university: d.university, headers: d.headers, dataRows: [] }))
+        ));
+      }
+    } catch (e) { try { localStorage.removeItem(STORAGE_RAW); } catch (_) {} }
+  }
+
+  function resetAll() {
+    [STORAGE_RECORDS, STORAGE_DATASETS, STORAGE_RAW, STORAGE_VERSION].forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+    Object.assign(state, { records:[], datasets:[], rawDatasets:[], uploadQueue:[], selectedUniversities:["ALL"], compare:false });
+    document.getElementById("upload-file-list").innerHTML = "";
+    showScreen("upload");
+    refreshUploadScreen();
+  }
+
+  function showScreen(name) {
+    ["upload","calibration","dashboard"].forEach(s => {
+      document.getElementById("screen-"+s).style.display = s === name ? "" : "none";
+    });
+  }
+
+  // ── UPLOAD SCREEN ──────────────────────────────────────────
+  function setupUploadScreen() {
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("file-input");
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", e => { e.preventDefault(); dropzone.classList.remove("dragover"); handleFiles(e.dataTransfer.files); });
+    fileInput.addEventListener("change", e => handleFiles(e.target.files));
+    document.getElementById("btn-back-to-dashboard").addEventListener("click", () => { showScreen("dashboard"); buildDashboard(); });
+  }
+
+  function refreshUploadScreen() {
+    document.getElementById("btn-back-to-dashboard").style.display = state.records.length > 0 ? "" : "none";
+  }
+
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || []).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+    if (!files.length) return;
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = DE.readWorkbook(buf);
+        state.uploadQueue.push({ fileName: file.name, sheets: wb.sheets, sheetNames: wb.sheetNames, selectedSheet: wb.sheetNames[0] });
+      } catch (e) { console.error("Error reading file", file.name, e); }
+    }
+    processQueue();
+  }
+
+  function processQueue() {
+    if (state.uploadQueue.length === 0) {
+      if (state.records.length > 0) { persist(); showScreen("dashboard"); buildDashboard(); }
+      else { showScreen("upload"); refreshUploadScreen(); }
+      return;
+    }
+    showScreen("calibration");
+    renderCalibration(state.uploadQueue[0]);
+  }
+
+  // ── CALIBRATION SCREEN ─────────────────────────────────────
+  function getTemplates() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_TEMPLATES) || "{}"); } catch (e) { return {}; }
+  }
+  function saveTemplate(name, mapping) {
+    const t = getTemplates(); t[name] = mapping;
+    try { localStorage.setItem(STORAGE_TEMPLATES, JSON.stringify(t)); } catch (e) {}
+  }
+  function truncate(s, n) { s = String(s==null?"":s); return s.length>n ? s.slice(0,n-1)+"…" : s; }
+
+  function renderCalibration(item) {
+    const config = state.config;
+    const content = document.getElementById("calibration-content");
+    const rows = item.sheets[item.selectedSheet];
+    const cols = DE.previewColumns(rows, 2);
+    const templates = getTemplates();
+    const defaultMapping = DE.defaultMapping(config);
+    const fields = orderedFields(config);
+
+    const sheetOptions = item.sheetNames.map(s =>
+      `<option value="${s}" ${s===item.selectedSheet?"selected":""}>${s}</option>`).join("");
+    const templateOptions = `<option value="__default__">${t("calDefaultOption")}</option>` +
+      Object.keys(templates).map(name => `<option value="${name}">${name}</option>`).join("");
+
+    let lastCategory = null;
+    const tableRows = fields.map(f => {
+      const cat = fieldCategory(f.key);
+      let catRow = "";
+      if (cat !== lastCategory) { catRow = `<tr><td colspan="2" class="mapping-cat">${cat}</td></tr>`; lastCategory = cat; }
+      const opts = [`<option value="0" ${f.col===0?"selected":""}>${t("calNotAvail")}</option>`]
+        .concat(cols.map(c => {
+          const label = `Col ${c.index} — ${truncate(c.header||"(no title)",28)}` +
+            (c.samples.length ? ` — e.g. ${c.samples.map(s=>truncate(s,14)).join(", ")}` : "");
+          return `<option value="${c.index}" ${c.index===f.col?"selected":""}>${DE.escapeHtml(truncate(label,90))}</option>`;
+        }));
+      return catRow + `<tr><td>${DE.escapeHtml(f.label)}</td><td><select data-field="${f.key}">${opts.join("")}</select></td></tr>`;
+    }).join("");
+
+    content.innerHTML = `
+      <div class="info-box">${t("calInfo").replace("{file}", DE.escapeHtml(item.fileName))}
+        ${item.sheetNames.length>1 ? ` — sheet: <select id="sheet-select" style="margin-left:6px;">${sheetOptions}</select>` : ""}
+      </div>
+      <div class="flex-between" style="margin-bottom:14px;align-items:flex-end;">
+        <div>
+          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">${t("calUniLabel")}</label><br>
+          <input type="text" id="university-override" placeholder="e.g. University of Nantes" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);min-width:300px;font-family:inherit;">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.04em;">${t("calTemplateLabel")}</label><br>
+          <select id="template-select" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-family:inherit;">${templateOptions}</select>
+          <button id="btn-save-template" class="btn btn-light btn-sm">${t("calSaveTemplate")}</button>
+        </div>
+      </div>
+      <div style="max-height:440px;overflow:auto;border:1px solid var(--border);border-radius:10px;">
+        <table class="mapping-table"><thead><tr><th>${t("calExpectedVar")}</th><th>${t("calSourceCol")}</th></tr></thead>
+        <tbody>${tableRows}</tbody></table>
+      </div>
+      <div class="flex-between" style="margin-top:18px;">
+        <button id="btn-cancel-file" class="btn btn-light">${t("calSkip")}</button>
+        <div style="display:flex;gap:10px;">
+          <button id="btn-use-default" class="btn btn-light">${t("calDefault")}</button>
+          <button id="btn-confirm-mapping" class="btn btn-primary">${t("calConfirm")}</button>
+        </div>
+      </div>`;
+
+    const sheetSel = document.getElementById("sheet-select");
+    if (sheetSel) sheetSel.addEventListener("change", e => { item.selectedSheet = e.target.value; renderCalibration(item); });
+
+    document.getElementById("template-select").addEventListener("change", e => {
+      const val = e.target.value;
+      const mapping = val === "__default__" ? defaultMapping : templates[val];
+      if (!mapping) return;
+      content.querySelectorAll("select[data-field]").forEach(sel => {
+        const col = mapping[sel.getAttribute("data-field")] !== undefined ? mapping[sel.getAttribute("data-field")] : 0;
+        if (sel.querySelector(`option[value="${col}"]`)) sel.value = String(col);
+      });
+    });
+    document.getElementById("btn-save-template").addEventListener("click", () => {
+      const name = window.prompt(t("calTemplateLabel") + " :");
+      if (!name) return;
+      saveTemplate(name, readMappingFromForm(content));
+      renderCalibration(item);
+    });
+    document.getElementById("btn-cancel-file").addEventListener("click", () => { state.uploadQueue.shift(); processQueue(); });
+    document.getElementById("btn-use-default").addEventListener("click", () => finalizeFile(item, defaultMapping));
+    document.getElementById("btn-confirm-mapping").addEventListener("click", () => finalizeFile(item, readMappingFromForm(content)));
+  }
+
+  function readMappingFromForm(content) {
+    const mapping = {};
+    content.querySelectorAll("select[data-field]").forEach(sel => {
+      mapping[sel.getAttribute("data-field")] = parseInt(sel.value,10)||0;
+    });
+    return mapping;
+  }
+
+  function finalizeFile(item, mapping) {
+    const overrideEl = document.getElementById("university-override");
+    const override = overrideEl && overrideEl.value.trim() ? overrideEl.value.trim() : null;
+    const rows = item.sheets[item.selectedSheet];
+    const records = DE.processRows(rows, mapping, state.config, override);
+    state.records = state.records.concat(records);
+    const { headers, dataRows } = DE.extractAllColumns(rows);
+    const universities = {};
+    records.forEach(r => { universities[r.University] = (universities[r.University]||0)+1; });
+    Object.keys(universities).forEach(u => {
+      state.datasets.push({ fileName: item.fileName, university: u, n: universities[u] });
+      state.rawDatasets.push({ fileName: item.fileName, university: u, headers, dataRows });
+    });
+    state.uploadQueue.shift();
+    processQueue();
+  }
+
+  // ── DASHBOARD SCREEN ───────────────────────────────────────
+  function buildTabLabels() {
+    const tabsInner = document.getElementById("tabs-inner");
+    if (!tabsInner) return;
+    const tabs = Dashboard.SECTIONS.map(s => ({ id: s.id, label: t("sec_"+s.id) || s.label }))
+      .concat([{ id: "data", label: t("tabData") }]);
+    tabsInner.innerHTML = tabs.map(tab =>
+      `<button data-tab="${tab.id}" ${tab.id===state.activeTab?"class='active'":""}>${tab.label}</button>`
+    ).join("");
+    tabsInner.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => { state.activeTab = btn.getAttribute("data-tab"); renderActiveTab(); });
+    });
+  }
+
+  function setupDashboardScreen() {
+    const sectionsHtml = Dashboard.SECTIONS.map(s => `<section id="section-${s.id}" class="dashboard-section"></section>`).join("")
+      + `<section id="section-data" class="dashboard-section"></section>`;
+    document.getElementById("dashboard-sections").innerHTML = sectionsHtml;
+
+    // Multi-select dropdown
+    document.getElementById("multi-select-trigger").addEventListener("click", e => {
+      e.stopPropagation();
+      const dd = document.getElementById("multi-select-dropdown");
+      dd.style.display = dd.style.display === "none" ? "block" : "none";
+    });
+    document.addEventListener("click", () => {
+      document.getElementById("multi-select-dropdown").style.display = "none";
+    });
+    document.getElementById("multi-select-dropdown").addEventListener("click", e => e.stopPropagation());
+
+    document.getElementById("compare-toggle").addEventListener("change", e => {
+      state.compare = e.target.checked;
+      renderActiveTab();
+    });
+
+    document.getElementById("btn-add-data").addEventListener("click", () => { refreshUploadScreen(); showScreen("upload"); });
+    document.getElementById("btn-export").addEventListener("click", exportJSON);
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      if (window.confirm("Resetting will delete all data. Continue?")) resetAll();
+    });
+  }
+
+  function buildDashboard() {
+    const universities = [...new Set(state.records.map(r => r.University))].sort();
+
+    // Build multi-select options
+    const optAll = document.getElementById("opt-all");
+    optAll.checked = state.selectedUniversities.includes("ALL");
+
+    const uniOpts = document.getElementById("uni-options");
+    uniOpts.innerHTML = universities.map(u => {
+      const n = state.records.filter(r => r.University === u).length;
+      const checked = state.selectedUniversities.includes(u) ? "checked" : "";
+      return `<label class="multi-option">
+        <input type="checkbox" value="${DE.escapeHtml(u)}" ${checked}>
+        <span>${DE.escapeHtml(u)} <small>(n=${n})</small></span>
+      </label>`;
+    }).join("");
+
+    // Events on checkboxes
+    optAll.addEventListener("change", () => {
+      if (optAll.checked) {
+        state.selectedUniversities = ["ALL"];
+        uniOpts.querySelectorAll("input").forEach(cb => cb.checked = false);
+      }
+      onSelectionChange();
+    });
+    uniOpts.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.addEventListener("change", () => {
+        optAll.checked = false;
+        const checked = [...uniOpts.querySelectorAll("input:checked")].map(c => c.value);
+        state.selectedUniversities = checked.length ? checked : ["ALL"];
+        if (!checked.length) optAll.checked = true;
+        onSelectionChange();
+      });
+    });
+
+    // Compare toggle: only enable when not ALL
+    const compareToggle = document.getElementById("compare-toggle");
+    compareToggle.checked = state.compare;
+    updateCompareToggle();
+
+    // Build tab labels and render
+    buildTabLabels();
+    updateMultiDisplay();
+    updateNChip();
+
+    if (!Dashboard.SECTIONS.some(s => s.id === state.activeTab) && state.activeTab !== "data") {
+      state.activeTab = "overview";
+    }
+    renderActiveTab();
+  }
+
+  function onSelectionChange() {
+    updateCompareToggle();
+    updateMultiDisplay();
+    updateNChip();
+    renderActiveTab();
+  }
+
+  function updateCompareToggle() {
+    const isAll = state.selectedUniversities.includes("ALL") || state.selectedUniversities.length !== 1;
+    const compareToggle = document.getElementById("compare-toggle");
+    if (isAll) { compareToggle.checked = false; state.compare = false; compareToggle.disabled = true; }
+    else { compareToggle.disabled = false; }
+  }
+
+  function updateMultiDisplay() {
+    const display = document.getElementById("multi-select-display");
+    if (!display) return;
+    if (state.selectedUniversities.includes("ALL")) {
+      display.textContent = t("allUniversities") + ` (n=${state.records.length})`;
+    } else if (state.selectedUniversities.length === 1) {
+      display.textContent = state.selectedUniversities[0];
+    } else {
+      display.textContent = `${state.selectedUniversities.length} ${t("respondents").startsWith("r") ? "universities" : "universités"}`;
+    }
+  }
+
+  function updateNChip() {
+    const base = getBaseRecords();
+    const chip = document.getElementById("n-chip");
+    if (chip) chip.textContent = `n = ${base.length} ${base.length===1 ? t("respondent") : t("respondents")}`;
+  }
+
+  function getBaseRecords() {
+    if (state.selectedUniversities.includes("ALL")) return state.records;
+    return state.records.filter(r => state.selectedUniversities.includes(r.University));
+  }
+
+  function renderActiveTab() {
+    const tabsInner = document.getElementById("tabs-inner");
+    if (tabsInner) {
+      tabsInner.querySelectorAll("button").forEach(b =>
+        b.classList.toggle("active", b.getAttribute("data-tab") === state.activeTab));
+    }
+    document.querySelectorAll("#dashboard-sections .dashboard-section").forEach(s => s.classList.remove("active"));
+    const filterBar = document.querySelector(".filter-bar");
+
+    if (state.activeTab === "data") {
+      if (filterBar) filterBar.style.display = "none";
+      document.getElementById("section-data").classList.add("active");
+      renderDataTab();
+      return;
+    }
+    if (filterBar) filterBar.style.display = "";
+    document.getElementById("section-"+state.activeTab).classList.add("active");
+
+    // Build selectedUniversity compat string for Dashboard (keeps backward compat)
+    const selUni = state.selectedUniversities.includes("ALL")
+      ? "ALL"
+      : state.selectedUniversities.length === 1
+        ? state.selectedUniversities[0]
+        : "__MULTI__";
+
+    Dashboard.render(state.activeTab, {
+      records: state.records,
+      rawDatasets: state.rawDatasets,
+      selectedUniversity: selUni,
+      selectedUniversities: state.selectedUniversities,
+      compare: state.compare,
+      lang: getLang(),
+    });
+  }
+
+  // ── DATA TAB ───────────────────────────────────────────────
+  function renderDataTab() {
+    const container = document.getElementById("section-data");
+    const byUniversity = {};
+    state.records.forEach(r => { byUniversity[r.University] = (byUniversity[r.University]||0)+1; });
+
+    const filesHtml = state.datasets.length === 0
+      ? `<div class="empty-state"><p>No files imported yet.</p></div>`
+      : `<table class="stat-table">
+          <thead><tr><th>Source file</th><th>Detected university</th><th class="num">Respondents</th></tr></thead>
+          <tbody>${state.datasets.map(d =>
+            `<tr><td>${DE.escapeHtml(d.fileName)}</td><td>${DE.escapeHtml(d.university)}</td><td class="num">${d.n}</td></tr>`
+          ).join("")}</tbody>
+        </table>`;
+
+    container.innerHTML = `
+      <div class="section-title"><span class="stripe"></span><h2>${t("tabData")}</h2></div>
+      <div class="grid">
+        <div class="card"><h3>Imported files</h3>${filesHtml}</div>
+        <div class="card"><h3>Respondents per university</h3>
+          <table class="stat-table">
+            <thead><tr><th>University</th><th class="num">Respondents</th></tr></thead>
+            <tbody>${Object.keys(byUniversity).sort().map(u =>
+              `<tr><td>${DE.escapeHtml(u)}</td><td class="num">${byUniversity[u]}</td></tr>`
+            ).join("")}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:18px;">
+        <h3>Actions</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;padding-bottom:14px;">
+          <button id="btn-data-add" class="btn btn-primary">${t("addData")}</button>
+          <button id="btn-data-export" class="btn btn-light">${t("exportBtn")}</button>
+          <button id="btn-data-import" class="btn btn-light">Import a JSON export</button>
+          <input type="file" id="data-import-input" accept=".json" style="display:none;">
+          <button id="btn-data-reset" class="btn btn-light">${t("resetBtn")}</button>
+        </div>
+      </div>`;
+
+    document.getElementById("btn-data-add").addEventListener("click", () => { refreshUploadScreen(); showScreen("upload"); });
+    document.getElementById("btn-data-export").addEventListener("click", exportJSON);
+    document.getElementById("btn-data-reset").addEventListener("click", () => {
+      if (window.confirm("Resetting will delete all data. Continue?")) resetAll();
+    });
+    document.getElementById("btn-data-import").addEventListener("click", () =>
+      document.getElementById("data-import-input").click());
+    document.getElementById("data-import-input").addEventListener("change", importJSON);
+  }
+
+  function exportJSON() {
+    try {
+      const blob = new Blob([JSON.stringify({ records: state.records, datasets: state.datasets, exportedAt: new Date().toISOString() })], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), { href: url, download: "dataset.json" });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) { window.alert("Export error: "+e.message); }
+  }
+
+  function importJSON(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (Array.isArray(data.records) && data.records.length > 0) {
+          state.records = state.records.concat(data.records);
+          state.datasets = state.datasets.concat(data.datasets||[]);
+          persist(); buildDashboard();
+        } else { window.alert("Invalid or empty JSON file."); }
+      } catch (err) { window.alert("Unable to read this JSON file."); }
+    };
+    reader.readAsText(file); e.target.value = "";
+  }
+
+  init();
+})();

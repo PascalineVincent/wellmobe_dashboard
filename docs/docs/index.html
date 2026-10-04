@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobility Insights</title>
+  <link rel="stylesheet" href="css/style.css?v=12">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ================= UPLOAD SCREEN ================= -->
+    <div id="screen-upload" class="screen">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle js-app-subtitle"></p>
+          </div>
+          <div class="header-actions">
+            <div class="lang-switcher">
+              <button class="lang-btn" data-lang="en">EN</button>
+              <button class="lang-btn" data-lang="fr">FR</button>
+              <button class="lang-btn" data-lang="es">ES</button>
+            </div>
+            <a href="rapport_simplifie.pdf" target="_blank" class="btn btn-ghost js-overview-btn"></a>
+            <button id="btn-back-to-dashboard" class="btn btn-ghost" style="display:none;"></button>
+          </div>
+        </div>
+      </header>
+      <main>
+        <div class="center-screen">
+          <div class="info-box js-upload-how"></div>
+          <div id="dropzone" class="dropzone">
+            <div class="icon">↑</div>
+            <p><strong class="js-upload-btn"></strong></p>
+            <p class="js-upload-drop"></p>
+            <input type="file" id="file-input" accept=".xlsx,.xls" multiple style="display:none">
+          </div>
+          <div id="upload-file-list" class="file-list"></div>
+        </div>
+      </main>
+      <footer class="app-footer">
+        <div class="rainbow-bar" style="margin-bottom:10px;"></div>
+        Mobility Insights — local analysis, no data sent to an external server.
+      </footer>
+    </div>
+
+    <!-- ================= CALIBRATION SCREEN ================= -->
+    <div id="screen-calibration" class="screen" style="display:none;">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle js-cal-subtitle"></p>
+          </div>
+          <div class="header-actions">
+            <div class="lang-switcher">
+              <button class="lang-btn" data-lang="en">EN</button>
+              <button class="lang-btn" data-lang="fr">FR</button>
+              <button class="lang-btn" data-lang="es">ES</button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main>
+        <div id="calibration-content"></div>
+      </main>
+    </div>
+
+    <!-- ================= DASHBOARD SCREEN ================= -->
+    <div id="screen-dashboard" class="screen" style="display:none;">
+      <div class="rainbow-bar"></div>
+      <header class="app-header">
+        <div class="header-inner">
+          <div>
+            <h1 class="js-app-title">Mobility Insights</h1>
+            <p class="subtitle js-app-subtitle"></p>
+          </div>
+          <div class="header-actions">
+            <div class="lang-switcher">
+              <button class="lang-btn" data-lang="en">EN</button>
+              <button class="lang-btn" data-lang="fr">FR</button>
+              <button class="lang-btn" data-lang="es">ES</button>
+            </div>
+            <a href="rapport_simplifie.pdf" target="_blank" class="btn btn-ghost js-overview-btn"></a>
+            <button id="btn-add-data" class="btn btn-ghost"></button>
+            <button id="btn-export" class="btn btn-ghost"></button>
+            <button id="btn-reset" class="btn btn-ghost"></button>
+          </div>
+        </div>
+      </header>
+      <nav class="tabs"><div class="tabs-inner" id="tabs-inner"></div></nav>
+      <main>
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label class="js-filter-label" for="university-select"></label>
+            <div class="multi-select-wrap" id="multi-select-wrap">
+              <button class="multi-select-trigger" id="multi-select-trigger">
+                <span id="multi-select-display"></span>
+                <span class="arrow">▾</span>
+              </button>
+              <div class="multi-select-dropdown" id="multi-select-dropdown" style="display:none;">
+                <label class="multi-option all-option">
+                  <input type="checkbox" id="opt-all" value="ALL">
+                  <span class="js-all-label"></span>
+                </label>
+                <div id="uni-options"></div>
+              </div>
+            </div>
+          </div>
+          <div class="toggle-wrap">
+            <input type="checkbox" id="compare-toggle">
+            <label for="compare-toggle" class="js-compare-label" style="margin:0;text-transform:none;font-weight:600;font-size:0.85rem;"></label>
+          </div>
+          <div class="chip" id="n-chip"></div>
+        </div>
+        <div id="dashboard-sections"></div>
+      </main>
+      <footer class="app-footer">
+        <div class="rainbow-bar" style="margin-bottom:10px;"></div>
+        Mobility Insights — local analysis, no data sent to an external server.
+      </footer>
+    </div>
+
+  </div>
+
+  <script src="js/lib/xlsx.full.min.js?v=12"></script>
+  <script src="js/lib/chart.umd.min.js?v=12"></script>
+  <script src="js/i18n.js?v=12"></script>
+  <script src="js/dataEngine.js?v=12"></script>
+  <script src="js/charts.js?v=12"></script>
+  <script src="js/dashboard.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
+</body>
+</html>
