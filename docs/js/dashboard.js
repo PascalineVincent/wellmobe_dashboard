@@ -609,33 +609,77 @@ const Dashboard = (() => {
   // J. Comparison between universities
   // ===========================================================
   function renderUniversities(ctx) {
-    const { all } = getCtxData(ctx);
+    const { all, unis: selUnis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-universities");
 
-    const unis = [...new Set(all.map((r) => r.University))].sort();
+    // Use selected universities if specific ones chosen, otherwise all
+    const allUnis = [...new Set(all.map((r) => r.University))].sort();
+    const isFiltered = !selUnis.includes("ALL") && selUnis.length > 1;
+    const unis = isFiltered ? selUnis.filter(u => allUnis.includes(u)) : allUnis;
+    // Records to use for comparison
+    const pool = isFiltered
+      ? all.filter(r => unis.includes(r.University))
+      : all;
 
     if (unis.length < 2) {
       container.innerHTML = sectionHeader("Comparison between universities",
-        "This section compares the composition of mobility groups across the different universities loaded into the tool.", "rk_universities") +
-        emptyState("Load data from at least two universities to enable this comparison.");
+        "This section compares the composition of mobility groups across universities.", "rk_universities") +
+        emptyState(typeof t !== "undefined" && t("loadTwoUniv") !== "loadTwoUniv"
+          ? t("loadTwoUniv")
+          : "Load data from at least two universities to enable this comparison.");
       return;
     }
 
-    const compData = crossPct(all, "University", "groupe", order);
-    const nByUni = DE.countBy(all, "University");
+    const uniH = Math.max(260, unis.length * 36) + "px";
+    const compData = crossPct(pool, "University", "groupe", order);
+    const nByUni = DE.countBy(pool, "University");
+
+    // Key indicators per university
+    const uniStats = unis.map(u => {
+      const recs = pool.filter(r => r.University === u);
+      const g4pct = recs.length ? (recs.filter(r => r.groupe === "Does not want to go").length / recs.length * 100) : null;
+      const vulnMean = DE.mean(recs.map(r => r.score_vuln).filter(v => v !== null && !isNaN(v)));
+      const intlMean = DE.mean(recs.map(r => r.score_intl).filter(v => v !== null && !isNaN(v)));
+      return { u, n: recs.length, g4pct, vulnMean, intlMean };
+    });
 
     container.innerHTML = sectionHeader("Comparison between universities",
-      `This section compares, across all ${unis.length} loaded universities, the composition of the four mobility groups, as well as the number of respondents per site.`) +
-      `<div class="grid">
-        ${card("chart-univ-comp", "Group composition by university", "Each row totals 100%: compare the share of each mobility profile across sites.", "", "h-300")}
-        ${card("chart-univ-n", "Number of respondents per university", "", "", "h-300")}
-      </div>`;
+      `Comparing ${unis.length} universities: group composition, vulnerability index, and international profile.`, "rk_universities") +
+      (isFiltered ? `<div class="info-box" style="margin-bottom:14px;">Showing <strong>${unis.length} selected universities</strong>. Deselect to show all loaded universities.</div>` : "") +
+      `<div class="grid cols-1">
+        ${card("chart-univ-comp", "Group composition by university (%)", "Each row totals 100%. Compare the share of each mobility profile across sites.", "", "h-" + Math.max(260, unis.length * 40))}
+      </div>
+      <div class="grid">
+        ${card("chart-univ-n", "Respondents per university", "", "", "h-280")}
+        ${card("chart-univ-g4", "% Does not want to go (G4)", "Higher = more non-mobile students.", "", "h-280")}
+      </div>
+      <div class="grid">
+        ${card("chart-univ-vuln", "Mean structural vulnerability (Vi, 0-10)", "Higher = more structurally constrained.", "", "h-280")}
+        ${card("chart-univ-intl", "Mean international profile score (0-10)", "Higher = more internationally open.", "", "h-280")}
+      </div>
+      <div class="grid cols-1"><div class="card">
+        <h3>Summary table</h3>
+        <table class="stat-table">
+          <thead><tr><th>University</th><th class="num">n</th><th class="num">G4 %</th><th class="num">Vi mean</th><th class="num">Intl. score</th></tr></thead>
+          <tbody>${uniStats.map(s => `<tr>
+            <td>${DE.escapeHtml(s.u)}</td>
+            <td class="num">${s.n}</td>
+            <td class="num">${s.g4pct !== null ? Math.round(s.g4pct) + "%" : "–"}</td>
+            <td class="num">${s.vulnMean !== null ? s.vulnMean.toFixed(2) : "–"}</td>
+            <td class="num">${s.intlMean !== null ? s.intlMean.toFixed(2) : "–"}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+      </div></div>`;
 
     Charts.stackedPercentChart(document.getElementById("chart-univ-comp"), unis,
       order.map((g) => ({ key: g, label: labels[g], color: CFG.groups.colors[g] })), compData);
-
-    Charts.barChart(document.getElementById("chart-univ-n"), unis, unis.map((u) => nByUni[u] || 0), { horizontal: true, colors: COLOR_BASE });
+    Charts.barChart(document.getElementById("chart-univ-n"), unis, unis.map(u => nByUni[u] || 0), { horizontal: true, colors: COLOR_BASE });
+    Charts.barChart(document.getElementById("chart-univ-g4"), unis, uniStats.map(s => s.g4pct), { horizontal: true, colors: CFG.groups.colors["Does not want to go"], max: 100 });
+    if (uniStats.some(s => s.vulnMean !== null))
+      Charts.barChart(document.getElementById("chart-univ-vuln"), unis, uniStats.map(s => s.vulnMean), { horizontal: true, colors: COLOR_BASE, max: 10 });
+    if (uniStats.some(s => s.intlMean !== null))
+      Charts.barChart(document.getElementById("chart-univ-intl"), unis, uniStats.map(s => s.intlMean), { horizontal: true, colors: CFG.theme.accent || COLOR_BASE, max: 10 });
   }
 
   // ===========================================================

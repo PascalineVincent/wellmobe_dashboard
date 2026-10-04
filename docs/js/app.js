@@ -69,6 +69,12 @@
           if (alL) alL.textContent = t("allUniversities");
           const fL = document.querySelector(".js-filter-label");
           if (fL) fL.textContent = t("filterUniversity");
+          const ctL = document.querySelector(".js-compare-label");
+          if (ctL) ctL.textContent = t("compareToggle");
+          // Rebuild tab labels in current language
+          if (window._buildTabLabels) window._buildTabLabels();
+          // Re-render active section to translate section headers
+          if (state.records.length > 0) renderActiveTab();
         });
       });
     }
@@ -407,14 +413,19 @@
 
   function setupDashboardScreen() {
     const tabsInner = document.getElementById("tabs-inner");
-    const tabs = Dashboard.SECTIONS.map((s) => ({ id: s.id, label: s.label })).concat([{ id: "data", label: "Data" }]);
-    tabsInner.innerHTML = tabs.map((t) => `<button data-tab="${t.id}">${t.label}</button>`).join("");
-    tabsInner.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.activeTab = btn.getAttribute("data-tab");
-        renderActiveTab();
+    function _buildTabLabels() {
+      const tabs = Dashboard.SECTIONS.map((s) => ({
+        id: s.id,
+        label: (typeof t !== "undefined" && t("sec_"+s.id) !== "sec_"+s.id) ? t("sec_"+s.id) : s.label
+      })).concat([{ id: "data", label: (typeof t !== "undefined" && t("tabData") !== "tabData") ? t("tabData") : "Data" }]);
+      tabsInner.innerHTML = tabs.map((tb) => `<button data-tab="${tb.id}" ${tb.id===state.activeTab?"class='active'":""}>${tb.label}</button>`).join("");
+      tabsInner.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => { state.activeTab = btn.getAttribute("data-tab"); renderActiveTab(); });
       });
-    });
+    }
+    _buildTabLabels();
+    window._buildTabLabels = _buildTabLabels;
+
 
     const sectionsHtml = Dashboard.SECTIONS.map((s) => `<section id="section-${s.id}" class="dashboard-section"></section>`).join("")
       + `<section id="section-data" class="dashboard-section"></section>`;
