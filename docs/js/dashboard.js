@@ -167,7 +167,7 @@ const Dashboard = (() => {
   // A. Overview
   // ===========================================================
   function renderOverview(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const colors = order.map((g) => CFG.groups.colors[g]);
     const container = document.getElementById("section-overview");
@@ -246,12 +246,30 @@ const Dashboard = (() => {
   // B. Socio-demographic profile
   // ===========================================================
   function renderSocio(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-socio");
 
+    if (multiMode) {
+      const _cats = field => [...new Set(all.map(r=>r[field]).filter(Boolean))].sort();
+      const _pct = (recs, field, cat) => { const n=recs.filter(r=>r[field]!=null).length; return n?recs.filter(r=>r[field]===cat).length/n*100:0; };
+      container.innerHTML = sectionHeader("Socio-demographic profile",
+        `Comparing socio-demographic profiles across ${unis.length} universities.`, "rk_socio") +
+        `<div class="info-box" style="margin-bottom:12px;"><strong>${unis.length} universities:</strong> ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-mu-genre","Gender by university (%)","","","h-280")}
+          ${card("chart-mu-niveau","Study level by university (%)","","","h-280")}
+        </div><div class="grid cols-1">
+          ${card("chart-mu-zone","Geographic area by university (%)","","","h-280")}
+        </div>`;
+      multiUniGrouped("chart-mu-genre",  unis,all,_cats("genre"),   (r,c)=>_pct(r,"genre",c),   {max:100,horizontal:true});
+      multiUniGrouped("chart-mu-niveau", unis,all,_cats("niveau"),  (r,c)=>_pct(r,"niveau",c),  {max:100,horizontal:true});
+      multiUniGrouped("chart-mu-zone",   unis,all,_cats("zone_geo"),(r,c)=>_pct(r,"zone_geo",c),{max:100,horizontal:true});
+      return;
+    }
+
     container.innerHTML = sectionHeader("Socio-demographic profile",
-      "Distribution of respondents by gender, level of study and geographic area of origin, and the composition of each mobility group along these characteristics.") +
+      "Distribution of respondents by gender, level of study and geographic area of origin, and the composition of each mobility group along these characteristics.", "rk_socio") +
       (compareActive ? legendBar() : "") +
       `<div class="grid">
         ${card("chart-socio-genre", "Gender", "Distribution of respondents by self-reported gender.")}
@@ -284,7 +302,7 @@ const Dashboard = (() => {
   // C. Academic & language profile
   // ===========================================================
   function renderAcademic(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-academic");
 
@@ -348,7 +366,7 @@ const Dashboard = (() => {
   // D. Financial profile
   // ===========================================================
   function renderFinancial(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-financial");
 
@@ -433,7 +451,7 @@ const Dashboard = (() => {
   // E. Parental capital
   // ===========================================================
   function renderParental(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-parental");
 
@@ -456,6 +474,21 @@ const Dashboard = (() => {
         "No answer": total ? (na / total) * 100 : 0,
       };
     });
+
+    if (multiMode) {
+      container.innerHTML = sectionHeader("Parental capital",
+        `Comparing parental capital across ${unis.length} universities.`, "rk_parental") +
+        `<div class="info-box" style="margin-bottom:12px;"><strong>${unis.length} universities:</strong> ${DE.escapeHtml(unis.join(", "))}</div>` +
+        `<div class="grid">
+          ${card("chart-mu-educ", "Parental education (1-6) by university", "Mean.", "", "h-280")}
+          ${card("chart-mu-pareras", "Parent who did Erasmus (%) by university", "", "", "h-280")}
+        </div>`;
+      multiUniBar("chart-mu-educ", unis, all,
+        recs => DE.mean(recs.map(r=>r.educ_num).filter(v=>v!=null)), {max:6});
+      multiUniBar("chart-mu-pareras", unis, all,
+        recs => { const v=recs.filter(r=>r.parental_erasmus!=null); return v.length?v.filter(r=>r.parental_erasmus==="Yes").length/v.length*100:null; }, {max:100});
+      return;
+    }
 
     const educCmp = meanCompare(base, all, "educ_num", compareActive);
     const parEraCmp = { b: pctOf(base, "parental_erasmus", "Yes"), a: compareActive ? pctOf(all, "parental_erasmus", "Yes") : null };
@@ -488,7 +521,7 @@ const Dashboard = (() => {
   // F. International & psychological profile
   // ===========================================================
   function renderInternational(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-international");
 
@@ -552,7 +585,7 @@ const Dashboard = (() => {
   // G. Barriers to mobility
   // ===========================================================
   function renderBarriers(ctx) {
-    const { all, base, compareActive } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis } = getCtxData(ctx);
     const container = document.getElementById("section-barriers");
 
     const freinFields = CFG.fields.filter((f) => f.key.startsWith("frein_"));
@@ -645,7 +678,7 @@ const Dashboard = (() => {
   // H. Reasons for going (Group 1 only)
   // ===========================================================
   function renderReasons(ctx) {
-    const { base } = getCtxData(ctx);
+    const { base, multiMode, unis } = getCtxData(ctx);
     const container = document.getElementById("section-reasons");
 
     const grp1 = base.filter((r) => r.groupe === "Already gone");
@@ -681,7 +714,7 @@ const Dashboard = (() => {
   // I. Group 2 vs Group 3
   // ===========================================================
   function renderGrp23(ctx) {
-    const { base } = getCtxData(ctx);
+    const { base, multiMode, unis } = getCtxData(ctx);
     const container = document.getElementById("section-grp23");
 
     const grp2 = base.filter((r) => r.groupe === "Wants to go & applied");
@@ -807,7 +840,7 @@ const Dashboard = (() => {
   // K. Statistical tests
   // ===========================================================
   function renderStats(ctx) {
-    const { all, base, sel } = getCtxData(ctx);
+    const { all, base, multiMode, unis, sel } = getCtxData(ctx);
     const order = CFG.groups.order;
     const container = document.getElementById("section-stats");
 
@@ -941,7 +974,7 @@ const Dashboard = (() => {
   // L. Policy Warnings — two sections: G4 + G2/G3
   // ===========================================================
   function renderWarnings(ctx) {
-    const { all, base, compareActive, sel } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis, sel } = getCtxData(ctx);
     const container = document.getElementById("section-warnings");
     const order = CFG.groups.order;
 
@@ -1346,7 +1379,7 @@ const Dashboard = (() => {
   // M. Structural Vulnerability Index
   // ===========================================================
   function renderVulnerability(ctx) {
-    const { base } = getCtxData(ctx);
+    const { base, multiMode, unis } = getCtxData(ctx);
     const order = CFG.groups.order, labels = CFG.groups.labels;
     const container = document.getElementById("section-vulnerability");
 
@@ -1477,7 +1510,7 @@ const Dashboard = (() => {
   const _explorerState = { colIndex: null, source: "raw" };
 
   function renderExplorer(ctx) {
-    const { all, base, compareActive, sel } = getCtxData(ctx);
+    const { all, base, compareActive, multiMode, unis, sel } = getCtxData(ctx);
     const container = document.getElementById("section-explorer");
     const rawDatasets = ctx.rawDatasets || [];
 
@@ -1569,7 +1602,7 @@ const Dashboard = (() => {
   }
 
   function renderExplorerContent(ctx, rawDatasets, relevantRaw, sel) {
-    const { base, all, compareActive } = getCtxData(ctx);
+    const { base, all, compareActive, multiMode, unis } = getCtxData(ctx);
     const container = document.getElementById("explorer-content");
     if (!container) return;
 
