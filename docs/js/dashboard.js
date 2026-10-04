@@ -25,9 +25,7 @@ const Dashboard = (() => {
     const all = ctx.records;
     const sel = ctx.selectedUniversity;
     const unis = ctx.selectedUniversities || (sel === "ALL" ? ["ALL"] : [sel]);
-    const base = unis.includes("ALL")
-      ? all
-      : all.filter(r => unis.includes(r.University));
+    const base = unis.includes("ALL") ? all : all.filter((r) => unis.includes(r.University));
     const compareActive = !unis.includes("ALL") && unis.length === 1 && ctx.compare;
     return { all, base, compareActive, sel, unis };
   }
@@ -67,11 +65,9 @@ const Dashboard = (() => {
     return `<div class="kpi-card"><div class="kpi-value">${value}</div><div class="kpi-label">${label}</div></div>`;
   }
   function legendBar() {
-    const lSel = typeof t !== "undefined" ? t("legendSel") : "Selected universities";
-    const lAll = typeof t !== "undefined" ? t("legendAll") : "Entire sample";
     return `<div class="legend-pair" style="margin:-8px 0 16px;">
-      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>${lSel}</span>
-      <span class="item"><span class="swatch" style="background:${COLOR_ALL}"></span>${lAll}</span>
+      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>${(typeof t!=="undefined"&&t("legendSel")!=="legendSel")?t("legendSel"):"Selected universities"}</span>
+      <span class="item"><span class="swatch" style="background:${COLOR_ALL}"></span>${(typeof t!=="undefined"&&t("legendAll")!=="legendAll")?t("legendAll"):"Entire sample"}</span>
     </div>`;
   }
   function emptyState(msg) {
@@ -79,10 +75,8 @@ const Dashboard = (() => {
   }
   function readingKey(rkKey) {
     if (!rkKey || typeof t === "undefined") return "";
-    const label = t("readingKey") || "How to read";
-    const text  = t(rkKey) || "";
-    if (!text) return "";
-    return `<div class="reading-key"><span class="rk-label">${label} —</span> ${text}</div>`;
+    const text = t(rkKey); if (!text || text === rkKey) return "";
+    return `<div class="reading-key"><span class="rk-label">${t("readingKey")||"How to read"} —</span> ${text}</div>`;
   }
 
   function pctOf(records, field, value) {
@@ -788,7 +782,7 @@ const Dashboard = (() => {
 
     const n = base.length;
     if (n === 0) {
-      container.innerHTML = sectionHeader("Policy Warnings", "", "rk_warnings") + emptyState("No data for this selection.");
+      container.innerHTML = sectionHeader("Policy Warnings", "") + emptyState("No data for this selection.");
       return;
     }
 
@@ -1173,7 +1167,7 @@ const Dashboard = (() => {
       </div>`;
 
     container.innerHTML = sectionHeader("Policy Warnings",
-      "Automatically computed indicators organised in two sections: students who don't want to go (Group 4) and motivated students who haven't yet applied or gone (Groups 2 & 3). Each indicator includes a suggested policy recommendation and updates in real time as you switch between universities.") +
+      "Automatically computed indicators organised in two sections: students who don't want to go (Group 4) and motivated students who haven't yet applied or gone (Groups 2 & 3). Each indicator includes a suggested policy recommendation and updates in real time as you switch between universities.", "rk_warnings") +
       dividerHtml("Section 1 — Group 4: Students who don't want to go", `n=${grp4.length} respondents`) +
       summaryKpis(indsG4) +
       `<div class="grid cols-1">${indsG4.map(buildCard).join("")}</div>` +

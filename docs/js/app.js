@@ -16,9 +16,9 @@
   const state = {
     config: null,
     records: [],
-    datasets: [],
-    rawDatasets: [],
-    uploadQueue: [],
+    datasets: [],    // {fileName, university, n}
+    rawDatasets: [], // {fileName, university, headers, dataRows} for variable explorer
+    uploadQueue: [], // {fileName, sheets, sheetNames, selectedSheet}
     activeTab: "overview",
     selectedUniversity: "ALL",
     selectedUniversities: ["ALL"],
@@ -50,43 +50,32 @@
   // bootstrap
   // ---------------------------------------------------------
 
-
-  // ── i18n label updater ──────────────────────────────────────
-  function applyI18nLabels() {
-    if (typeof t === "undefined") return;
-    document.querySelectorAll(".js-upload-how").forEach(el => el.innerHTML = t("uploadHow"));
-    document.querySelectorAll(".js-upload-btn").forEach(el => el.textContent = t("uploadBtn"));
-    document.querySelectorAll(".js-upload-drop").forEach(el => el.textContent = t("uploadDrop"));
-    document.querySelectorAll(".js-filter-label").forEach(el => el.textContent = t("filterUniversity"));
-    document.querySelectorAll(".js-compare-label").forEach(el => el.textContent = t("compareToggle"));
-    document.querySelectorAll(".js-all-label").forEach(el => el.textContent = t("allUniversities"));
-    const back = document.getElementById("btn-back-to-dashboard");
-    if (back) back.textContent = t("backDashboard");
-    const add = document.getElementById("btn-add-data");
-    if (add) add.textContent = t("addData");
-  }
-
   async function init() {
-    // Setup lang switchers before fetch
-    document.querySelectorAll(".lang-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("data-lang") === getLang());
-      btn.addEventListener("click", () => {
-        setLang(btn.getAttribute("data-lang"));
-        document.querySelectorAll(".lang-btn").forEach(b =>
-          b.classList.toggle("active", b.getAttribute("data-lang") === getLang()));
-        applyI18nLabels();
-        if (state.records.length > 0) renderActiveTab();
-      });
-    });
-
-    const res = await fetch("config/config.json?v=12");
+    const res = await fetch("config/config.json?v=11");
     state.config = await res.json();
     Dashboard.init(state.config);
+
+    // Language switcher
+    if (typeof getLang !== "undefined") {
+      document.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-lang") === getLang());
+        btn.addEventListener("click", () => {
+          setLang(btn.getAttribute("data-lang"));
+          document.querySelectorAll(".lang-btn").forEach((b) =>
+            b.classList.toggle("active", b.getAttribute("data-lang") === getLang()));
+          const uh = document.querySelector(".js-upload-how");
+          if (uh) uh.innerHTML = t("uploadHow");
+          const alL = document.querySelector(".js-all-label");
+          if (alL) alL.textContent = t("allUniversities");
+          const fL = document.querySelector(".js-filter-label");
+          if (fL) fL.textContent = t("filterUniversity");
+        });
+      });
+    }
 
     document.querySelectorAll(".js-app-title").forEach((el) => (el.textContent = state.config.meta.title));
     document.querySelectorAll(".js-app-subtitle").forEach((el) => (el.textContent = state.config.meta.subtitle));
     document.title = state.config.meta.title;
-    applyI18nLabels();
 
     setupUploadScreen();
     setupDashboardScreen();
@@ -431,18 +420,20 @@
       + `<section id="section-data" class="dashboard-section"></section>`;
     document.getElementById("dashboard-sections").innerHTML = sectionsHtml;
 
-    // Multi-select dropdown
-    document.getElementById("multi-select-trigger").addEventListener("click", function(e) {
-      e.stopPropagation();
-      const dd = document.getElementById("multi-select-dropdown");
-      dd.style.display = dd.style.display === "none" ? "block" : "none";
-    });
+    // Multi-select university
+    const _msTrigger = document.getElementById("multi-select-trigger");
+    const _msDropdown = document.getElementById("multi-select-dropdown");
+    if (_msTrigger && _msDropdown) {
+      _msTrigger.addEventListener("click", function(e) {
+        e.stopPropagation();
+        _msDropdown.style.display = _msDropdown.style.display === "none" ? "block" : "none";
+      });
+      _msDropdown.addEventListener("click", function(e) { e.stopPropagation(); });
+    }
     document.addEventListener("click", function() {
       const dd = document.getElementById("multi-select-dropdown");
       if (dd) dd.style.display = "none";
     });
-    const msDrop = document.getElementById("multi-select-dropdown");
-    if (msDrop) msDrop.addEventListener("click", function(e) { e.stopPropagation(); });
 
     document.getElementById("compare-toggle").addEventListener("change", (e) => {
       state.compare = e.target.checked;
@@ -461,98 +452,91 @@
     });
   }
 
+
+  function _applyUniSelection() {
+    const isAll = state.selectedUniversities.includes("ALL");
+    state.selectedUniversity = isAll ? "ALL"
+      : state.selectedUniversities.length === 1 ? state.selectedUniversities[0] : "__MULTI__";
+    const ct = document.getElementById("compare-toggle");
+    if (isAll || state.selectedUniversities.length !== 1) {
+      ct.checked = false; state.compare = false; ct.disabled = true;
+    } else { ct.disabled = false; }
+    _updateMultiDisplay();
+    updateNChip();
+    renderActiveTab();
+  }
+
+  function _updateMultiDisplay(totalN) {
+    const el = document.getElementById("multi-select-display");
+    if (!el) return;
+    if (state.selectedUniversities.includes("ALL")) {
+      const n = totalN !== undefined ? totalN : state.records.length;
+      el.textContent = "All universities (n=" + n + ")";
+    } else if (state.selectedUniversities.length === 1) {
+      el.textContent = state.selectedUniversities[0];
+    } else {
+      el.textContent = state.selectedUniversities.length + " universities";
+    }
+  }
+
   function buildDashboard() {
-    const universities = [...new Set(state.records.map(r => r.University))].sort();
+    const universities = [...new Set(state.records.map((r) => r.University))].sort();
     const totalN = state.records.length;
 
     // Populate multi-select
     const optAll = document.getElementById("opt-all");
-    if (optAll) {
+    const uniOpts = document.getElementById("uni-options");
+    if (optAll && uniOpts) {
       optAll.checked = state.selectedUniversities.includes("ALL");
-      // Remove old event listeners by replacing element
+      uniOpts.innerHTML = universities.map((u) => {
+        const n = state.records.filter((r) => r.University === u).length;
+        const chk = state.selectedUniversities.includes(u) ? "checked" : "";
+        return `<label class="multi-option"><input type="checkbox" value="${DE.escapeHtml(u)}" ${chk}> ${DE.escapeHtml(u)} (n=${n})</label>`;
+      }).join("");
+      // Re-attach events (cloneNode trick to clear old listeners)
       const newOptAll = optAll.cloneNode(true);
       optAll.parentNode.replaceChild(newOptAll, optAll);
-      newOptAll.addEventListener("change", function() {
+      newOptAll.addEventListener("change", () => {
         if (newOptAll.checked) {
           state.selectedUniversities = ["ALL"];
-          document.querySelectorAll("#uni-options input").forEach(cb => cb.checked = false);
+          document.querySelectorAll("#uni-options input").forEach((c) => (c.checked = false));
         }
-        onUniSelectionChange();
+        _applyUniSelection();
       });
-    }
-
-    const uniOpts = document.getElementById("uni-options");
-    if (uniOpts) {
-      uniOpts.innerHTML = universities.map(u => {
-        const n = state.records.filter(r => r.University === u).length;
-        const checked = state.selectedUniversities.includes(u) ? "checked" : "";
-        return `<label class="multi-option">
-          <input type="checkbox" value="${DE.escapeHtml(u)}" ${checked}>
-          <span>${DE.escapeHtml(u)} <small>(n=${n})</small></span>
-        </label>`;
-      }).join("");
-      uniOpts.querySelectorAll("input[type=checkbox]").forEach(cb => {
-        cb.addEventListener("change", function() {
-          const optAllEl = document.getElementById("opt-all");
-          if (optAllEl) optAllEl.checked = false;
-          const checked = [...document.querySelectorAll("#uni-options input:checked")].map(c => c.value);
-          state.selectedUniversities = checked.length ? checked : ["ALL"];
-          if (!checked.length && optAllEl) optAllEl.checked = true;
-          onUniSelectionChange();
+      uniOpts.querySelectorAll("input").forEach((cb) => {
+        cb.addEventListener("change", () => {
+          document.getElementById("opt-all").checked = false;
+          const sel = [...document.querySelectorAll("#uni-options input:checked")].map((c) => c.value);
+          state.selectedUniversities = sel.length ? sel : ["ALL"];
+          if (!sel.length) document.getElementById("opt-all").checked = true;
+          _applyUniSelection();
         });
       });
+      _updateMultiDisplay(totalN);
     }
-    updateMultiDisplay(totalN);
+
+    if (![...state.selectedUniversities].some((u) => u === "ALL" || universities.includes(u))) {
+      state.selectedUniversities = ["ALL"];
+    }
+    state.selectedUniversity = state.selectedUniversities.includes("ALL") ? "ALL"
+      : state.selectedUniversities.length === 1 ? state.selectedUniversities[0] : "__MULTI__";
 
     const compareToggle = document.getElementById("compare-toggle");
     compareToggle.checked = state.compare;
     compareToggle.disabled = state.selectedUniversities.includes("ALL") || state.selectedUniversities.length !== 1;
 
     updateNChip();
-    if (!Dashboard.SECTIONS.some(s => s.id === state.activeTab) && state.activeTab !== "data") {
+    if (!Dashboard.SECTIONS.some((s) => s.id === state.activeTab) && state.activeTab !== "data") {
       state.activeTab = "overview";
     }
     renderActiveTab();
   }
 
-  function onUniSelectionChange() {
-    const isAll = state.selectedUniversities.includes("ALL");
-    const compareToggle = document.getElementById("compare-toggle");
-    if (isAll || state.selectedUniversities.length !== 1) {
-      compareToggle.checked = false;
-      state.compare = false;
-      compareToggle.disabled = true;
-    } else {
-      compareToggle.disabled = false;
-    }
-    // Sync selectedUniversity (single) for backward compat with dashboard.js
-    state.selectedUniversity = isAll ? "ALL"
-      : state.selectedUniversities.length === 1 ? state.selectedUniversities[0]
-      : "__MULTI__";
-    updateMultiDisplay();
-    updateNChip();
-    renderActiveTab();
-  }
-
-  function updateMultiDisplay(totalN) {
-    const display = document.getElementById("multi-select-display");
-    if (!display) return;
-    const allN = totalN !== undefined ? totalN : state.records.length;
-    if (state.selectedUniversities.includes("ALL")) {
-      display.textContent = (typeof t !== "undefined" ? t("allUniversities") : "All universities") + ` (n=${allN})`;
-    } else if (state.selectedUniversities.length === 1) {
-      display.textContent = state.selectedUniversities[0];
-    } else {
-      display.textContent = `${state.selectedUniversities.length} universities selected`;
-    }
-  }
-
   function updateNChip() {
     const base = state.selectedUniversities.includes("ALL")
       ? state.records
-      : state.records.filter(r => state.selectedUniversities.includes(r.University));
-    const chip = document.getElementById("n-chip");
-    if (chip) chip.textContent = `n = ${base.length} respondent${base.length === 1 ? "" : "s"}`;
+      : state.records.filter((r) => state.selectedUniversities.includes(r.University));
+    document.getElementById("n-chip").textContent = `n = ${base.length} respondent${base.length === 1 ? "" : "s"}`;
   }
 
   function renderActiveTab() {
@@ -576,7 +560,6 @@
       selectedUniversity: state.selectedUniversity,
       selectedUniversities: state.selectedUniversities,
       compare: state.compare,
-      lang: typeof getLang !== "undefined" ? getLang() : "en",
     });
   }
 

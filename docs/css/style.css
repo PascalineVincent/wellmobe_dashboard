@@ -477,122 +477,24 @@ a { color: var(--blue); }
 }
 
 /* ============================================================
-   v12 additions — language switcher, multi-select, reading keys
+   v12 — lang switcher, multi-select, reading keys
    ============================================================ */
+.lang-switcher { display:flex; gap:4px; align-items:center; }
+.lang-btn { padding:3px 9px; border-radius:6px; border:1px solid rgba(255,255,255,0.25); background:transparent; color:rgba(255,255,255,0.65); font-size:0.74rem; font-weight:700; cursor:pointer; letter-spacing:0.04em; transition:all 0.15s; }
+.lang-btn:hover { background:rgba(255,255,255,0.12); color:#fff; }
+.lang-btn.active { background:rgba(255,255,255,0.2); color:#fff; border-color:rgba(255,255,255,0.5); }
 
-/* ── Language switcher ─────────────────────────────────────── */
-.lang-switcher {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-.lang-btn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: transparent;
-  color: rgba(255,255,255,0.65);
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: all 0.15s;
-}
-.lang-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
-.lang-btn.active { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.5); }
+.multi-select-wrap { position:relative; display:inline-block; }
+.multi-select-trigger { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:9px; border:1.5px solid var(--border); background:#fff; color:var(--text); font-family:inherit; font-size:0.86rem; font-weight:600; cursor:pointer; min-width:220px; }
+.multi-select-trigger:hover { border-color:var(--accent); }
+.ms-arrow { font-size:0.7rem; color:var(--gray); }
+.multi-select-dropdown { position:absolute; top:calc(100% + 5px); left:0; min-width:100%; max-width:380px; max-height:300px; overflow-y:auto; background:#fff; border:1.5px solid var(--border); border-radius:10px; box-shadow:var(--shadow-lg); z-index:300; padding:4px 0; }
+.multi-option { display:flex; align-items:center; gap:9px; padding:7px 14px; cursor:pointer; font-size:0.85rem; color:var(--text); }
+.multi-option:hover { background:var(--light); }
+.multi-all { font-weight:700; border-bottom:1px solid var(--border); padding-bottom:9px; margin-bottom:3px; }
+.multi-option input[type="checkbox"] { accent-color:var(--accent); width:14px; height:14px; flex-shrink:0; }
 
-/* ── Multi-select dropdown ─────────────────────────────────── */
-.multi-select-wrap {
-  position: relative;
-  display: inline-block;
-  min-width: 240px;
-}
-.multi-select-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.multi-select-trigger:hover { border-color: var(--accent); }
-.multi-select-trigger .arrow { font-size: 0.7rem; color: var(--gray); flex-shrink: 0; }
-.multi-select-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 100%;
-  max-width: 400px;
-  max-height: 320px;
-  overflow-y: auto;
-  background: #fff;
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  z-index: 200;
-  padding: 6px 0;
-}
-.multi-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-size: 0.86rem;
-  color: var(--text);
-  transition: background 0.1s;
-}
-.multi-option:hover { background: var(--light); }
-.multi-option.all-option {
-  font-weight: 700;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-  padding-bottom: 10px;
-}
-.multi-option input[type="checkbox"] {
-  accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-}
-.multi-option small { color: var(--gray); font-size: 0.78rem; }
+.reading-key { background:linear-gradient(90deg,#EBF3FD,#F5F9FF); border-left:3px solid var(--accent); border-radius:0 7px 7px 0; padding:8px 15px; margin:0 0 18px; font-size:0.81rem; line-height:1.55; color:var(--text); }
+.rk-label { font-weight:700; color:var(--navy); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; }
 
-/* ── Reading key ───────────────────────────────────────────── */
-.reading-key {
-  background: linear-gradient(90deg, var(--ice-blue) 0%, #F0F5FF 100%);
-  border-left: 3px solid var(--accent);
-  border-radius: 0 8px 8px 0;
-  padding: 9px 16px;
-  margin: 0 0 20px 0;
-  font-size: 0.82rem;
-  line-height: 1.55;
-  color: var(--text);
-}
-.reading-key .rk-label {
-  font-weight: 700;
-  color: var(--navy);
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-}
-
-/* ── Header actions row ────────────────────────────────────── */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* ── Group color overrides (screenshot palette) ─────────────
-   Applied via config.json — no CSS override needed for Chart.js.
-   But we update the legend swatch colors via CSS variable usage.  */
+.header-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
