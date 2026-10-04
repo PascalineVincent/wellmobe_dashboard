@@ -33,10 +33,10 @@
       "Does not want to go"
     ],
     "colors": {
-      "Already gone": "#27AE60",
-      "Wants to go & applied": "#2980B9",
-      "Wants to go": "#5DADE2",
-      "Does not want to go": "#C0392B"
+      "Already gone": "#27AE9E",
+      "Wants to go & applied": "#6E59A5",
+      "Wants to go": "#A891D4",
+      "Does not want to go": "#8C9BAC"
     },
     "labels": {
       "Already gone": "Already gone",

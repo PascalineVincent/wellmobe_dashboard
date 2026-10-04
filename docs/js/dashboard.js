@@ -23,10 +23,17 @@ const Dashboard = (() => {
 
   function getCtxData(ctx) {
     const all = ctx.records;
-    const sel = ctx.selectedUniversity;
-    const base = sel === "ALL" ? all : all.filter((r) => r.University === sel);
-    const compareActive = sel !== "ALL" && ctx.compare;
-    return { all, base, compareActive, sel };
+    const sel = ctx.selectedUniversity;        // "ALL" | "UniA" | "__MULTI__"
+    const unis = ctx.selectedUniversities || (sel === "ALL" ? ["ALL"] : [sel]);
+    const base = unis.includes("ALL")
+      ? all
+      : all.filter(r => unis.includes(r.University));
+    // compare: only enabled when exactly 1 university is selected vs full sample
+    const compareActive = !unis.includes("ALL") && unis.length === 1 && ctx.compare;
+    const selLabel = unis.includes("ALL")
+      ? (typeof t !== "undefined" ? t("allUniversities") : "All universities")
+      : unis.join(", ");
+    return { all, base, compareActive, sel, selLabel, unis };
   }
 
   function fmtPct(x) { return x === null || x === undefined || isNaN(x) ? "–" : Math.round(x) + "%"; }
@@ -51,9 +58,10 @@ const Dashboard = (() => {
     return "";
   }
 
-  function sectionHeader(title, desc) {
+  function sectionHeader(title, desc, rkKey) {
     return `<div class="section-title"><span class="stripe"></span><h2>${title}</h2></div>` +
-      (desc ? `<p class="section-desc">${desc}</p>` : "");
+      (desc ? `<p class="section-desc">${desc}</p>` : "") +
+      (rkKey ? readingKey(rkKey) : "");
   }
   function card(id, title, note, extra, heightClass) {
     return `<div class="card"><h3>${title}</h3>${note ? `<p class="card-note">${note}</p>` : ""}
@@ -63,13 +71,21 @@ const Dashboard = (() => {
     return `<div class="kpi-card"><div class="kpi-value">${value}</div><div class="kpi-label">${label}</div></div>`;
   }
   function legendBar() {
+    const lSel = typeof t !== "undefined" ? t("legendSel") : "Selected universities";
+    const lAll = typeof t !== "undefined" ? t("legendAll") : "Entire sample";
     return `<div class="legend-pair" style="margin:-8px 0 16px;">
-      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>Selected university</span>
-      <span class="item"><span class="swatch" style="background:${COLOR_ALL}"></span>Entire sample</span>
+      <span class="item"><span class="swatch" style="background:${COLOR_SEL}"></span>${lSel}</span>
+      <span class="item"><span class="swatch" style="background:${COLOR_ALL}"></span>${lAll}</span>
     </div>`;
   }
   function emptyState(msg) {
     return `<div class="empty-state"><p>${msg}</p></div>`;
+  }
+  function readingKey(rkKey) {
+    const label = typeof t !== "undefined" ? t("readingKey") : "How to read";
+    const text  = typeof t !== "undefined" ? t(rkKey) : "";
+    if (!text) return "";
+    return `<p class="reading-key"><span class="rk-label">${label} —</span> ${text}</p>`;
   }
 
   function pctOf(records, field, value) {
@@ -156,7 +172,7 @@ const Dashboard = (() => {
     }
 
     container.innerHTML = sectionHeader("Overview",
-      "This section presents the overall composition of the sample: the share of respondents in each of the four mobility profiles (already gone, wants to go and has applied, wants to go without having applied, does not want to go), and the conversion funnel between these stages.") +
+      "This section presents the overall composition of the sample: the share of respondents in each of the four mobility profiles (already gone, wants to go and has applied, wants to go without having applied, does not want to go, "rk_overview"), and the conversion funnel between these stages.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-3">
         ${kpi(n, "Respondents" + (compareActive ? " (selected university)" : ""))}
@@ -364,7 +380,7 @@ const Dashboard = (() => {
     const parEraCmp = { b: pctOf(base, "parental_erasmus", "Yes"), a: compareActive ? pctOf(all, "parental_erasmus", "Yes") : null };
 
     container.innerHTML = sectionHeader("Parental capital",
-      "Parental education is coded on an ordinal scale from 1 (no formal education) to 6 (postgraduate studies) and reflects transmitted cultural capital. A parent's own Erasmus participation (Q13) gives direct access to information about the program.") +
+      "Parental education is coded on an ordinal scale from 1 (no formal education, "rk_parental") to 6 (postgraduate studies) and reflects transmitted cultural capital. A parent's own Erasmus participation (Q13) gives direct access to information about the program.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-3">
         ${kpi(fmtNum(educCmp.b.mean, 1) + (compareActive ? ` <span class="text-muted" style="font-size:1rem">/ ${fmtNum(educCmp.a.mean, 1)}</span>` : ""), "Parental education (/6)" + (compareActive ? " — selected / overall" : ""))}
@@ -409,7 +425,7 @@ const Dashboard = (() => {
     }));
 
     container.innerHTML = sectionHeader("International & psychological profile",
-      "The international profile score (0-10) summarizes 8 psychological items related to international openness (working abroad, curiosity, adaptability, European identity...). The radar chart shows, for each of the 7 broad psychological dimensions, the average score (1-5 scale) by mobility group.") +
+      "The international profile score (0-10, "rk_international") summarizes 8 psychological items related to international openness (working abroad, curiosity, adaptability, European identity...). The radar chart shows, for each of the 7 broad psychological dimensions, the average score (1-5 scale) by mobility group.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid">
         ${card("chart-intl-score", "International profile score (0-10) by group", `Mean ± standard error. Overall difference between groups: ${sigBadge(kwIntl.p)} (Kruskal-Wallis).`)}
@@ -473,7 +489,7 @@ const Dashboard = (() => {
       .slice(0, 8);
 
     container.innerHTML = sectionHeader("Barriers to mobility",
-      "Each barrier is rated on a scale from 1 (not a barrier at all) to 5 (major barrier). Items with no variance (identical response for everyone, usually due to questionnaire routing) are excluded. The bottom section identifies the barriers that most distinguish respondents who want to go from those who do not.") +
+      "Each barrier is rated on a scale from 1 (not a barrier at all, "rk_barriers") to 5 (major barrier). Items with no variance (identical response for everyone, usually due to questionnaire routing) are excluded. The bottom section identifies the barriers that most distinguish respondents who want to go from those who do not.") +
       (compareActive ? legendBar() : "") +
       `<div class="grid cols-1">
         ${card("chart-bar-means", "Average score per barrier (1-5)", "Mean ± standard error, sorted from strongest to weakest barrier.", "", "h-420")}
@@ -519,7 +535,7 @@ const Dashboard = (() => {
     const validKeys = DE.validLikertCols(grp1, raisonFields.map((f) => f.key));
 
     if (grp1.length === 0 || validKeys.length === 0) {
-      container.innerHTML = sectionHeader("Reasons for going (\u201CAlready gone\u201D group)",
+      container.innerHTML = sectionHeader("Reasons for going (\u201CAlready gone\u201D group, "rk_reasons")",
         "This section presents, for respondents who have already completed a mobility stay, the reasons that motivated their departure.") +
         emptyState("Not enough respondents in the \u201CAlready gone\u201D group for this selection.");
       return;
@@ -531,7 +547,7 @@ const Dashboard = (() => {
       return { key: f.key, label: f.label, mean: ms.mean, se: ms.se, n: ms.n };
     }).sort((a, b) => (b.mean || 0) - (a.mean || 0));
 
-    container.innerHTML = sectionHeader("Reasons for going (\u201CAlready gone\u201D group)",
+    container.innerHTML = sectionHeader("Reasons for going (\u201CAlready gone\u201D group, "rk_reasons")",
       `This section presents, for the ${grp1.length} respondents who have already completed a mobility stay, the reasons that motivated their departure (scale 1=not at all, 5=completely).` +
       (grp1.length < 10 ? " <strong>Note: small sample size, interpret with caution.</strong>" : "")) +
       `<div class="grid cols-1">
@@ -555,7 +571,7 @@ const Dashboard = (() => {
 
     if (grp2.length === 0 && grp3.length === 0) {
       container.innerHTML = sectionHeader("Group 2 vs Group 3: who follows through?",
-        "Comparison between respondents who want to go and have already applied (group 2) and those who want to go but have not (yet) applied (group 3).") +
+        "Comparison between respondents who want to go and have already applied (group 2, "rk_grp23") and those who want to go but have not (yet) applied (group 3).") +
         emptyState("Not enough respondents in these two groups for this selection.");
       return;
     }
@@ -572,7 +588,7 @@ const Dashboard = (() => {
     });
 
     container.innerHTML = sectionHeader("Group 2 vs Group 3: who follows through?",
-      `Comparison between respondents who want to go and have already applied ("Wants to go & applied", n=${grp2.length}) and those who want to go but have not yet applied ("Wants to go (not applied)", n=${grp3.length}). The chart shows normalized values (0-100, on each variable's own scale) to visually compare gaps; the table below gives the actual values.`) +
+      `Comparison between respondents who want to go and have already applied ("Wants to go & applied", n=${grp2.length}, "rk_grp23") and those who want to go but have not yet applied ("Wants to go (not applied)", n=${grp3.length}). The chart shows normalized values (0-100, on each variable's own scale) to visually compare gaps; the table below gives the actual values.`) +
       `<div class="grid cols-1">
         ${card("chart-grp23-dumbbell", "Normalized comparison (0-100)", "For each variable, relative position on its own scale. * p<0.05, ** p<0.01, *** p<0.001 (Mann-Whitney test).", "", "h-340")}
       </div>
@@ -610,8 +626,8 @@ const Dashboard = (() => {
 
     if (unis.length < 2) {
       container.innerHTML = sectionHeader("Comparison between universities",
-        "This section compares the composition of mobility groups across the different universities loaded into the tool.") +
-        emptyState("Load data from at least two universities to enable this comparison.");
+        "This section compares the composition of mobility groups across the different universities loaded into the tool.", "rk_universities") +
+        emptyState(typeof t !== "undefined" ? t("loadTwoUniv") : "Load data from at least two universities.");
       return;
     }
 
@@ -775,7 +791,7 @@ const Dashboard = (() => {
 
     const n = base.length;
     if (n === 0) {
-      container.innerHTML = sectionHeader("Policy Warnings", "") + emptyState("No data for this selection.");
+      container.innerHTML = sectionHeader("Policy Warnings", "", "rk_warnings") + emptyState(typeof t !== "undefined" ? t("noData") : "No data for this selection.");
       return;
     }
 
@@ -1160,7 +1176,7 @@ const Dashboard = (() => {
       </div>`;
 
     container.innerHTML = sectionHeader("Policy Warnings",
-      "Automatically computed indicators organised in two sections: students who don't want to go (Group 4) and motivated students who haven't yet applied or gone (Groups 2 & 3). Each indicator includes a suggested policy recommendation and updates in real time as you switch between universities.") +
+      "Automatically computed indicators organised in two sections: students who don't want to go (Group 4, "rk_warnings") and motivated students who haven't yet applied or gone (Groups 2 & 3). Each indicator includes a suggested policy recommendation and updates in real time as you switch between universities.") +
       dividerHtml("Section 1 — Group 4: Students who don't want to go", `n=${grp4.length} respondents`) +
       summaryKpis(indsG4) +
       `<div class="grid cols-1">${indsG4.map(buildCard).join("")}</div>` +
@@ -1179,8 +1195,8 @@ const Dashboard = (() => {
     const container = document.getElementById("section-vulnerability");
 
     if (base.length === 0) {
-      container.innerHTML = sectionHeader("Structural Vulnerability Index", "") +
-        emptyState("No data for this selection.");
+      container.innerHTML = sectionHeader("Structural Vulnerability Index", "", "rk_vulnerability") +
+        emptyState(typeof t !== "undefined" ? t("noData") : "No data for this selection.");
       return;
     }
 
@@ -1221,7 +1237,7 @@ const Dashboard = (() => {
     const mwu = DE.mannWhitneyU(byGroup["Wants to go & applied"], byGroup["Wants to go"]);
 
     container.innerHTML = sectionHeader("Structural Vulnerability Index",
-      `V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>) / 5 × 10 — 
+      `V<sub>i</sub> = (0.4·F<sub>i</sub> + 0.3·A<sub>i</sub> + 0.3·E<sub>i</sub>, "rk_vulnerability") / 5 × 10 — 
       <strong>F<sub>i</sub></strong>: financial constraint composite (financial comfort + household income + ability to absorb unexpected expense); 
       <strong>A<sub>i</sub></strong>: academic constraint; 
       <strong>E<sub>i</sub></strong>: parental education constraint. 
